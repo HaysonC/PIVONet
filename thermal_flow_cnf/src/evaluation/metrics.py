@@ -1,13 +1,25 @@
 from __future__ import annotations
 
 import numpy as np
-import torch
 from scipy.stats import entropy
 
 
-def mean_squared_displacement(trajs: np.ndarray) -> float:
-    # trajs: (N, T+1, 2)
-    disp = trajs[:, -1] - trajs[:, 0]
+def mean_squared_displacement(trajs: np.ndarray, mode: str = "total") -> float:
+    """Compute MSD based on final minus initial displacement.
+
+    Args:
+        trajs: (N, T+1, 2)
+        mode: 'total' uses x and y; 'transverse' uses y only; 'demeaned' subtracts mean displacement first
+    """
+    disp = trajs[:, -1] - trajs[:, 0]  # (N,2)
+    if mode == "transverse":
+        vals = disp[:, 1] ** 2
+        return float(np.mean(vals))
+    if mode == "demeaned":
+        mu = disp.mean(axis=0, keepdims=True)
+        d0 = disp - mu
+        return float(np.mean(np.sum(d0**2, axis=1)))
+    # default total
     return float(np.mean(np.sum(disp**2, axis=1)))
 
 

@@ -1,0 +1,15 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Install Python dependencies for thermal_flow_cnf",
+			"type": "shell",
+			"command": "pip install -r thermal_flow_cnf/requirements.txt",
+			"isBackground": false,
+			"problemMatcher": [
+				"$eslint-stylish"
+			],
+			"group": "build"
+		}
+	]
+}

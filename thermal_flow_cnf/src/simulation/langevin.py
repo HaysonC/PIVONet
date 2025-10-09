@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import Callable, Tuple
+from typing import Callable, Tuple, Optional
 
 import numpy as np
 from tqdm import trange
@@ -69,10 +69,14 @@ def simulate_dataset(
     T: int,
     H: float,
     x0_sampler: Callable[[int], np.ndarray] | None = None,
+    init_dist: str = "uniform",
+    init_mean: Optional[Tuple[float, float]] = None,
+    init_cov: Optional[np.ndarray] = None,
     theta: float | None = None,
     save_dir: str | None = None,
     prefix: str = "sim",
     seed: int | None = None,
+    progress_cb: Optional[Callable[[int, int], None]] = None,
 ):
     """Simulate a dataset of trajectories and optionally save them as .npz.
 
@@ -84,12 +88,18 @@ def simulate_dataset(
         rng = np.random.default_rng()
 
     if x0_sampler is None:
-        def default_x0_sampler(n: int) -> np.ndarray:
-            # Uniform in channel: x in [0, 1], y in [-H, H]
+        def default_uniform(n: int) -> np.ndarray:
             xs = rng.uniform(0.0, 1.0, size=(n,))
             ys = rng.uniform(-H, H, size=(n,))
             return np.stack([xs, ys], axis=1)
-        sampler = default_x0_sampler
+        def default_gaussian(n: int) -> np.ndarray:
+            mu = np.array(init_mean if init_mean is not None else [0.0, 0.0], dtype=float)
+            cov = np.array(init_cov if init_cov is not None else [[0.1, 0.0],[0.0, 0.1]], dtype=float)
+            pts = rng.multivariate_normal(mu, cov, size=n)
+            # clamp y within bounds to start inside channel
+            pts[:, 1] = np.clip(pts[:, 1], -H, H)
+            return pts
+        sampler = default_uniform if init_dist == "uniform" else default_gaussian
     else:
         sampler = x0_sampler
 
@@ -97,16 +107,30 @@ def simulate_dataset(
     thetas = np.full((num_particles,), theta if theta is not None else 0.0, dtype=float)
     trajs = np.zeros((num_particles, int(T) + 1, 2), dtype=float)
 
-    for i in trange(num_particles, desc="Simulating"):
+    iterator = range(num_particles) if progress_cb is not None else trange(num_particles, desc="Simulating")
+    for i in iterator:
         x0_i = x0s[i]
         _, theta_i, traj_i = simulate_trajectory(flow_fn, x0_i, D, dt, T, H, theta)
         thetas[i] = theta if theta is not None else 0.0
         trajs[i] = traj_i
+        if progress_cb is not None:
+            progress_cb(i + 1, num_particles)
 
     if save_dir is not None:
         os.makedirs(save_dir, exist_ok=True)
         out_path = os.path.join(save_dir, f"{prefix}_N{num_particles}_T{T}.npz")
-        np.savez_compressed(out_path, x0s=x0s, thetas=thetas, trajs=trajs, dt=dt, D=D, H=H)
+        meta = {
+            "x0s": x0s,
+            "thetas": thetas,
+            "trajs": trajs,
+            "dt": dt,
+            "D": D,
+            "H": H,
+            "init_dist": init_dist,
+            "init_mean": np.array(init_mean, dtype=float) if init_mean is not None else np.array([np.mean(x0s[:,0]), np.mean(x0s[:,1])], dtype=float),
+            "init_cov": np.cov(x0s.T),
+        }
+        np.savez_compressed(out_path, **meta)
         return out_path
 
-    return {"x0s": x0s, "thetas": thetas, "trajs": trajs, "dt": dt, "D": D, "H": H}
+    return {"x0s": x0s, "thetas": thetas, "trajs": trajs, "dt": dt, "D": D, "H": H, "init_dist": init_dist, "init_mean": init_mean, "init_cov": np.cov(x0s.T)}

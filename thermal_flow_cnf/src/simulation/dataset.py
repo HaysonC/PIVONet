@@ -21,8 +21,8 @@ class TrajectoryDataset(Dataset):
 
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         traj = torch.from_numpy(self.trajs[idx])  # (T+1, 2)
-        x_final = traj[-1]
-        x0 = torch.from_numpy(self.x0s[idx])
-        theta = torch.tensor([self.thetas[idx]])
-        context = torch.cat([x0, theta], dim=0)  # (3,)
+        x_final = traj[-1].to(torch.float32)
+        x0 = torch.from_numpy(self.x0s[idx]).to(torch.float32)
+        theta = torch.tensor([self.thetas[idx]], dtype=torch.float32)
+        context = torch.cat([x0, theta], dim=0).to(torch.float32)  # (3,)
         return x_final, x0, theta, context

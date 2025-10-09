@@ -1,6 +1,0 @@
-__pycache__/
-*.pt
-*.pth
-*.npz
-.ipynb_checkpoints/
-checkpoints/

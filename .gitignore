@@ -1,3 +1,19 @@
 venv/ 
 .ds_store
 __pycache__/
+
+.vscode/
+data/
+
+# jypyter notebook
+.ipynb_checkpoints
+*.ipynb
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+*.so
+*.dylib
+*.dSYM/
+*.egg-info/
+dist/   

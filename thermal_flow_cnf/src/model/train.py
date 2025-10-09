@@ -16,7 +16,19 @@ def compute_log_likelihood(model: CNF, x: torch.Tensor, context: torch.Tensor) -
     return model.log_prob(x, context, steps=16)
 
 
-def train_cnf(model: CNF, dataloader: Iterable, device: str = "cpu", epochs: int = 10, lr: float = 1e-3, ckpt_dir: str | None = None):
+from torch.utils.data import DataLoader
+from typing import Callable, Optional
+
+
+def train_cnf(
+    model: CNF,
+    dataloader: DataLoader,  # use DataLoader to ensure Sized
+    device: str = "cpu",
+    epochs: int = 10,
+    lr: float = 1e-3,
+    ckpt_dir: str | None = None,
+    progress_cb: Optional[Callable[[int, int, int, int, float], None]] = None,
+):
     model = model.to(device)
     optim = AdamW(model.parameters(), lr=lr)
     scheduler = CosineAnnealingLR(optim, T_max=max(1, epochs))
@@ -24,10 +36,12 @@ def train_cnf(model: CNF, dataloader: Iterable, device: str = "cpu", epochs: int
     for epoch in range(1, epochs + 1):
         model.train()
         running = 0.0
-        for batch in tqdm(dataloader, desc=f"Epoch {epoch}"):
+        inner = enumerate(dataloader)
+        total = len(dataloader)
+        for j, batch in inner:
             x_final, _x0, _theta, context = batch
-            x_final = x_final.to(device)
-            context = context.to(device)
+            x_final = x_final.to(device=device, dtype=torch.float32)
+            context = context.to(device=device, dtype=torch.float32)
 
             optim.zero_grad(set_to_none=True)
             log_likelihood = compute_log_likelihood(model, x_final, context)
@@ -36,7 +50,9 @@ def train_cnf(model: CNF, dataloader: Iterable, device: str = "cpu", epochs: int
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optim.step()
 
-            running += loss.item()
+            running += float(loss.item())
+            if progress_cb is not None:
+                progress_cb(epoch, epochs, j + 1, total, float(loss.item()))
 
         scheduler.step()
         avg = running / max(1, len(dataloader))
