@@ -1,0 +1,46 @@
+from __future__ import annotations
+
+from typing import Iterable
+
+import torch
+from torch.optim import AdamW
+from torch.optim.lr_scheduler import CosineAnnealingLR
+from tqdm import tqdm
+
+from .base_cnf import CNF
+from ..utils.io import save_checkpoint
+
+
+def compute_log_likelihood(model: CNF, x: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
+    # model.log_prob returns (B,1)
+    return model.log_prob(x, context, steps=16)
+
+
+def train_cnf(model: CNF, dataloader: Iterable, device: str = "cpu", epochs: int = 10, lr: float = 1e-3, ckpt_dir: str | None = None):
+    model = model.to(device)
+    optim = AdamW(model.parameters(), lr=lr)
+    scheduler = CosineAnnealingLR(optim, T_max=max(1, epochs))
+
+    for epoch in range(1, epochs + 1):
+        model.train()
+        running = 0.0
+        for batch in tqdm(dataloader, desc=f"Epoch {epoch}"):
+            x_final, _x0, _theta, context = batch
+            x_final = x_final.to(device)
+            context = context.to(device)
+
+            optim.zero_grad(set_to_none=True)
+            log_likelihood = compute_log_likelihood(model, x_final, context)
+            loss = -log_likelihood.mean()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            optim.step()
+
+            running += loss.item()
+
+        scheduler.step()
+        avg = running / max(1, len(dataloader))
+        if ckpt_dir is not None:
+            save_checkpoint(model, optim, f"{ckpt_dir}/cnf_epoch{epoch}.pt", epoch=epoch, loss=avg)
+
+    return model
