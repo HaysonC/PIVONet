@@ -17,3 +17,5 @@ __pycache__/
 *.dSYM/
 *.egg-info/
 dist/   
+
+checkpoints/

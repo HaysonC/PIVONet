@@ -215,6 +215,13 @@ with tabs[2]:
     st.subheader("Inference & Animate")
     dataset_path = st.session_state.get("dataset_path")
     ckpt_path = st.session_state.get("model_ckpt")
+    cA, cB, cC = st.columns(3)
+    with cA:
+        max_frames = st.number_input("Max frames", min_value=50, max_value=1000, value=300, step=50, help="Cap frames to keep embed small")
+    with cB:
+        frame_stride_in = st.number_input("Frame stride (0=auto)", min_value=0, max_value=50, value=0, step=1)
+    with cC:
+        embed_limit_mb = st.number_input("Embed limit (MB)", min_value=5.0, max_value=200.0, value=20.0, step=1.0)
     if dataset_path and st.button("Animate", key="animate_btn"):
         data = np.load(dataset_path)
         trajs = data["trajs"]
@@ -263,8 +270,10 @@ with tabs[2]:
                 tail=50,
                 init_mean=init_mean_loaded,
                 init_cov=init_cov_loaded,
+                max_frames=int(max_frames),
+                frame_stride=(int(frame_stride_in) if int(frame_stride_in) > 0 else None),
             )
-            components.html(animation_to_html(anim), height=420)
+            components.html(animation_to_html(anim, embed_limit_mb=float(embed_limit_mb)), height=420)
             st.toast("Animation ready", icon="🎞️")
         except Exception as e:
             log(f"[animate][error] {type(e).__name__}: {e}")

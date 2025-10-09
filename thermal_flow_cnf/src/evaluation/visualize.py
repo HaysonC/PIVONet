@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import animation
+import matplotlib as mpl
 from matplotlib.patches import Ellipse
 from io import BytesIO
 import base64
@@ -82,6 +83,8 @@ def animate_trajectories(
     tail: int | None = None,
     init_mean: np.ndarray | None = None,
     init_cov: np.ndarray | None = None,
+    max_frames: int = 300,
+    frame_stride: int | None = None,
 ):
     fig, ax = plt.subplots(figsize=(6, 4))
     n_true = trajs_true.shape[0]
@@ -148,10 +151,21 @@ def animate_trajectories(
                 lines_pred[k].set_data(trajs_pred[i, start:end_pred, 0], trajs_pred[i, start:end_pred, 1])
         return (*lines_true, *(lines_pred or []))
 
-    anim = animation.FuncAnimation(fig, update, frames=T, init_func=init, interval=interval, blit=True)
+    # Determine frames sequence to limit total frames for embedding size
+    stride = int(frame_stride) if frame_stride is not None else max(1, int(np.ceil(T / max(1, max_frames))))
+    frames_seq = list(range(0, T, stride))
+    anim = animation.FuncAnimation(fig, update, frames=frames_seq, init_func=init, interval=interval, blit=True)
     return anim
 
 
-def animation_to_html(anim: animation.FuncAnimation) -> str:
-    """Convert a Matplotlib animation to embeddable HTML using JS."""
+def animation_to_html(anim: animation.FuncAnimation, embed_limit_mb: float | None = None) -> str:
+    """Convert a Matplotlib animation to embeddable HTML using JS.
+
+    Optionally set a higher or lower embed_limit (in MB) to control the maximum embedded size.
+    """
+    if embed_limit_mb is not None:
+        try:
+            mpl.rcParams['animation.embed_limit'] = float(embed_limit_mb)
+        except Exception:
+            pass
     return anim.to_jshtml()
