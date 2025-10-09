@@ -1,5 +1,12 @@
 # Thermal Flow CNF
 
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
+![PyTorch](https://img.shields.io/badge/PyTorch-2.x-ee4c2c)
+![torchdiffeq](https://img.shields.io/badge/torchdiffeq-latest-4b8bbe)
+![Streamlit](https://img.shields.io/badge/Streamlit-app-ff4b4b)
+![Apple%20Silicon%20MPS](https://img.shields.io/badge/Apple%20Silicon-MPS%20supported-lightgrey)
+![License: MIT](https://img.shields.io/badge/License-MIT-green)
+
 Model, simulate, and analyze thermal particle transport in simple channel flows using a Continuous Normalizing Flow (CNF). This project provides:
 
 - A simulator for overdamped Langevin dynamics with reflecting boundaries and configurable flow profiles (uniform, Couette, Poiseuille)
@@ -87,7 +94,7 @@ This launches a browser at a local URL. The app is organized into tabs:
 - Train: Train the CNF
   - Choose device (cuda/mps/cpu), hidden size, epochs, and batch size
   - Training progress shows NLL, avg logp, and bits-per-dim (bpd)
-  - Checkpoints are optional; newest is auto-selected but you can choose “<none>” to run with a fresh model
+  - Checkpoints are optional; newest is auto-selected but you can choose the "no checkpoint" option to run with a fresh model
 - Inference & Animate: Animate true vs model trajectories
   - Uses the selected dataset and (optionally) a checkpoint
   - Initial Gaussian ellipse and mean marker are overlaid for context
@@ -139,7 +146,7 @@ Generated artifacts:
 
 - Checkpoint incompatibility
   - Checkpoints are validated against model metadata; if incompatible, the app warns and runs with a fresh model
-  - You can select "<none>" to skip loading any checkpoint
+  - You can select the "no checkpoint" option to skip loading any checkpoint
 
 - Model loss becomes negative
   - The optimization target is NLL = −log p(x|context). As the model improves, log-likelihood increases and NLL can become negative—this is normal for densities
@@ -154,5 +161,5 @@ Generated artifacts:
 
 ## License
 
-No explicit license specified. If you plan to use or distribute, consider adding a license file.
+This project is licensed under the MIT License. See [LICENSE](./LICENSE) for details.
  
