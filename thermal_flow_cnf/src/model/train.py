@@ -11,9 +11,9 @@ from .base_cnf import CNF
 from ..utils.io import save_checkpoint
 
 
-def compute_log_likelihood(model: CNF, x: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
+def compute_log_likelihood(model: CNF, x: torch.Tensor, context: torch.Tensor, steps_jitter: int = 0) -> torch.Tensor:
     # model.log_prob returns (B,1)
-    return model.log_prob(x, context, steps=16)
+    return model.log_prob(x, context, steps=16, stochastic_steps_jitter=steps_jitter)
 
 
 from torch.utils.data import DataLoader
@@ -28,6 +28,8 @@ def train_cnf(
     lr: float = 1e-3,
     ckpt_dir: str | None = None,
     progress_cb: Optional[Callable[[int, int, int, int, float], None]] = None,
+    data_noise_std: float = 0.0,
+    steps_jitter: int = 0,
 ):
     model = model.to(device)
     optim = AdamW(model.parameters(), lr=lr)
@@ -43,8 +45,12 @@ def train_cnf(
             x_final = x_final.to(device=device, dtype=torch.float32)
             context = context.to(device=device, dtype=torch.float32)
 
+            # Stochastic data augmentation: add small Gaussian jitter to targets
+            if data_noise_std and data_noise_std > 0.0:
+                x_final = x_final + torch.randn_like(x_final) * float(data_noise_std)
+
             optim.zero_grad(set_to_none=True)
-            log_likelihood = compute_log_likelihood(model, x_final, context)
+            log_likelihood = compute_log_likelihood(model, x_final, context, steps_jitter)
             loss = -log_likelihood.mean()
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)

@@ -10,11 +10,11 @@ from typing import Tuple, cast
 
 
 class ODEFunc(nn.Module):
-    def __init__(self, dim: int, cond_dim: int, hidden_dim: int = 64):
+    def __init__(self, dim: int, cond_dim: int, hidden_dim: int = 64, dropout_p: float = 0.0):
         super().__init__()
         self.dim = dim
         self.cond_dim = cond_dim
-        self.net = MLP(dim + cond_dim + 1, dim, hidden_dim)
+        self.net = MLP(dim + cond_dim + 1, dim, hidden_dim, dropout_p=dropout_p)
         self._context: torch.Tensor | None = None
 
     def set_context(self, context: torch.Tensor):
@@ -64,21 +64,26 @@ class CNF(nn.Module):
             traj_z.append(z)
             traj_lp.append(lp)
         return torch.stack(traj_z, dim=0), torch.stack(traj_lp, dim=0)
-    def __init__(self, dim: int, cond_dim: int, hidden_dim: int = 64):
+    def __init__(self, dim: int, cond_dim: int, hidden_dim: int = 64, dropout_p: float = 0.0):
         super().__init__()
         self.dim = dim
         self.cond_dim = cond_dim
         self.hidden_dim = hidden_dim
-        self.func = ODEFunc(dim, cond_dim, hidden_dim)
+        self.func = ODEFunc(dim, cond_dim, hidden_dim, dropout_p=dropout_p)
 
-    def flow(self, x: torch.Tensor, context: torch.Tensor, t0: float = 1.0, t1: float = 0.0, steps: int = 10) -> tuple[torch.Tensor, torch.Tensor]:
+    def flow(self, x: torch.Tensor, context: torch.Tensor, t0: float = 1.0, t1: float = 0.0, steps: int = 10, stochastic_steps_jitter: int = 0) -> tuple[torch.Tensor, torch.Tensor]:
         # Integrate from data time t0 to base time t1 (usually 1->0)
         B = x.size(0)
         device = x.device
         dtype = x.dtype if x.dtype in (torch.float32, torch.float16, torch.bfloat16) else torch.float32
         x = x.to(device=device, dtype=dtype)
         context = context.to(device=device, dtype=dtype)
-        tspan = torch.linspace(t0, t1, steps=steps, device=device, dtype=dtype)
+        # Optionally randomize number of steps per call for stochastic training
+        if stochastic_steps_jitter and self.training:
+            s = int(max(2, steps + torch.randint(low=-stochastic_steps_jitter, high=stochastic_steps_jitter + 1, size=(1,)).item()))
+        else:
+            s = int(steps)
+        tspan = torch.linspace(t0, t1, steps=s, device=device, dtype=dtype)
         logp0 = torch.zeros(B, 1, device=device, dtype=dtype)
         self.func.set_context(context)
         if x.device.type == "mps":
@@ -92,16 +97,16 @@ class CNF(nn.Module):
         logp1 = logp_traj[-1]
         return z1, logp1
 
-    def log_prob(self, x: torch.Tensor, context: torch.Tensor, base_std: float = 1.0, steps: int = 10):
+    def log_prob(self, x: torch.Tensor, context: torch.Tensor, base_std: float = 1.0, steps: int = 10, stochastic_steps_jitter: int = 0):
         # Map x -> z and accumulate logp; base is N(0, I)
-        z, delta_logp = self.flow(x, context, t0=1.0, t1=0.0, steps=steps)
+        z, delta_logp = self.flow(x, context, t0=1.0, t1=0.0, steps=steps, stochastic_steps_jitter=stochastic_steps_jitter)
         base_logprob = -0.5 * ((z / base_std) ** 2).sum(dim=1, keepdim=True) - 0.5 * self.dim * torch.log(
             torch.tensor(2 * torch.pi, device=x.device, dtype=x.dtype)
         ) - self.dim * torch.log(torch.tensor(base_std, device=x.device, dtype=x.dtype))
         return base_logprob + delta_logp
 
     @torch.no_grad()
-    def sample(self, n: int, context: torch.Tensor, base_std: float = 1.0, steps: int = 10) -> torch.Tensor:
+    def sample(self, n: int, context: torch.Tensor, base_std: float = 1.0, steps: int = 10, H: float | None = None, enforce_bounds: bool = True) -> torch.Tensor:
         device = context.device
         dtype = context.dtype if context.dtype in (torch.float32, torch.float16, torch.bfloat16) else torch.float32
         context = context.to(device=device, dtype=dtype)
@@ -119,10 +124,16 @@ class CNF(nn.Module):
         else:
             z_traj, _ = cast(tuple[torch.Tensor, torch.Tensor], odeint_adj(self.func, (z0, logp0), tspan, atol=1e-5, rtol=1e-5))
         x = z_traj[-1]
+        # Enforce simple reflecting boundary in y to keep samples within [-H, H]
+        if enforce_bounds and H is not None:
+            y = x[:, 1]
+            y = torch.where(y > H, 2 * H - y, y)
+            y = torch.where(y < -H, -2 * H - y, y)
+            x = torch.stack([x[:, 0], y], dim=1)
         return x
 
     @torch.no_grad()
-    def sample_trajectories(self, n: int, context: torch.Tensor, base_std: float = 1.0, steps: int = 50) -> torch.Tensor:
+    def sample_trajectories(self, n: int, context: torch.Tensor, base_std: float = 1.0, steps: int = 50, H: float | None = None, enforce_bounds: bool = True) -> torch.Tensor:
         device = context.device
         dtype = context.dtype if context.dtype in (torch.float32, torch.float16, torch.bfloat16) else torch.float32
         context = context.to(device=device, dtype=dtype)
@@ -135,5 +146,11 @@ class CNF(nn.Module):
         else:
             z_traj, _ = cast(tuple[torch.Tensor, torch.Tensor], odeint_adj(self.func, (z0, logp0), tspan, atol=1e-5, rtol=1e-5))
         # z_traj: (T, B, D) -> return (B, T, D)
-        return z_traj.permute(1, 0, 2).contiguous()
+        out = z_traj.permute(1, 0, 2).contiguous()
+        if enforce_bounds and H is not None:
+            y = out[:, :, 1]
+            y = torch.where(y > H, 2 * H - y, y)
+            y = torch.where(y < -H, -2 * H - y, y)
+            out = torch.stack([out[:, :, 0], y], dim=2)
+        return out
 

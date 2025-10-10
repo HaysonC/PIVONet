@@ -63,6 +63,7 @@ with st.sidebar:
 
     st.header("Model Settings")
     hidden_dim = st.number_input("Hidden Dim", value=64, min_value=16, step=16)
+    dropout_p = st.slider("Dropout p (stochastic)", min_value=0.0, max_value=0.5, value=0.0, step=0.05, help="Introduces stochasticity for training/inference when model in train mode")
     epochs = st.number_input("Epochs", value=5, min_value=1, step=1)
     batch = st.number_input("Batch Size", value=128, min_value=8, step=8)
     dev_opts = device_options()
@@ -143,7 +144,7 @@ with tabs[0]:
     default_idx = 0
     if current_dataset in datasets:
         default_idx = datasets.index(current_dataset)
-    dataset_path: Optional[str] = st.selectbox("Select Dataset", datasets if datasets else [""], index=default_idx) if datasets else None
+    dataset_path: Optional[str] = st.selectbox("Select Dataset", datasets if datasets else [""], index=default_idx, key="dataset_select") if datasets else None
     if dataset_path:
         st.session_state["dataset_path"] = dataset_path
         data = np.load(dataset_path)
@@ -153,20 +154,23 @@ with tabs[0]:
         st.write(f"Trajectories: {trajs.shape}")
         st.write(f"MSD ({msd_mode}): {mean_squared_displacement(trajs, mode=msd_mode):.4f}")
         log(f"[dataset] loaded: {os.path.basename(dataset_path)} | trajs={trajs.shape}")
-
+        # Recompute flow_fn using current sidebar parameters to reflect latest selection
         fig = plot_trajectories(trajs, flow_fn=build_flow(flow), H=H, n_show=50, init_mean=init_mean_loaded, init_cov=init_cov_loaded)
-        st.pyplot(fig)
+        st.pyplot(fig, clear_figure=True)
 
 with tabs[1]:
     st.subheader("Train CNF")
     dataset_path = st.session_state.get("dataset_path")
+    # Stochastic training settings (visible before starting training)
+    data_noise_std = st.number_input("Target jitter std (stochastic)", min_value=0.0, max_value=0.5, value=0.0, step=0.01)
+    steps_jitter = st.number_input("ODE steps jitter (+/-)", min_value=0, max_value=8, value=0, step=1, help="Randomize ODE steps per batch to regularize")
     if dataset_path and st.button("Train CNF", key="train_btn"):
         ds = TrajectoryDataset(dataset_path)
         from torch.utils.data import DataLoader
         dl = DataLoader(ds, batch_size=int(batch), shuffle=True)
         device = selected_device
-        log(f"[train] device={device}, hidden_dim={int(hidden_dim)}, epochs={int(epochs)}, batch={int(batch)}")
-        model = CNF(dim=2, cond_dim=3, hidden_dim=int(hidden_dim)).to(device)
+        log(f"[train] device={device}, hidden_dim={int(hidden_dim)}, dropout={float(dropout_p):.2f}, epochs={int(epochs)}, batch={int(batch)}, noise_std={float(data_noise_std):.3f}, steps_jitter=+/-{int(steps_jitter)}")
+        model = CNF(dim=2, cond_dim=3, hidden_dim=int(hidden_dim), dropout_p=float(dropout_p)).to(device)
         from thermal_flow_cnf.src.model.train import train_cnf
         p_outer = st.progress(0, text="Training epoch 0")
         p_inner = st.progress(0, text="Batch 0")
@@ -191,6 +195,8 @@ with tabs[1]:
             lr=CONFIG["lr"],
             ckpt_dir=ckpt_dir,
             progress_cb=tcb,
+            data_noise_std=float(data_noise_std),
+            steps_jitter=int(steps_jitter),
         )
         st.success("Training finished.")
         log("[train] finished")
@@ -233,7 +239,7 @@ with tabs[2]:
         context = torch.from_numpy(np.concatenate([x0s, thetas], axis=1)).to(torch.float32)
         device = selected_device
         context = context.to(device)
-        model = CNF(dim=2, cond_dim=3, hidden_dim=int(hidden_dim)).to(device)
+        model = CNF(dim=2, cond_dim=3, hidden_dim=int(hidden_dim), dropout_p=float(dropout_p)).to(device)
         # Load checkpoint if available
         if ckpt_path and os.path.isfile(ckpt_path):
             from thermal_flow_cnf.src.utils.io import load_checkpoint
@@ -254,7 +260,7 @@ with tabs[2]:
         log(f"[animate] device={device}, n_true={trajs.shape[0]}, T_true={trajs.shape[1]}, n_pred_req={n_samp}")
         with torch.no_grad():
             steps_anim = int(min(200, trajs.shape[1]))
-            z_pred = model.sample_trajectories(n=n_samp, context=ctx_batch, steps=steps_anim)
+            z_pred = model.sample_trajectories(n=n_samp, context=ctx_batch, steps=steps_anim, H=float(H), enforce_bounds=True)
         trajs_pred = z_pred.detach().cpu().numpy()
         log(f"[animate] pred trajs shape={trajs_pred.shape}")
 
@@ -291,7 +297,7 @@ with tabs[3]:
             x0s = data["x0s"].astype(np.float32)
             thetas = np.zeros((x0s.shape[0], 1), dtype=np.float32)
             context = torch.from_numpy(np.concatenate([x0s, thetas], axis=1)).to(torch.float32).to(selected_device)
-            model = CNF(dim=2, cond_dim=3, hidden_dim=int(hidden_dim)).to(selected_device)
+            model = CNF(dim=2, cond_dim=3, hidden_dim=int(hidden_dim), dropout_p=float(dropout_p)).to(selected_device)
             if ckpt_path and os.path.isfile(ckpt_path):
                 from thermal_flow_cnf.src.utils.io import load_checkpoint
                 load_checkpoint(model, optimizer=None, path=ckpt_path)
@@ -299,7 +305,7 @@ with tabs[3]:
             model.eval()
             with torch.no_grad():
                 n_eval = int(min(500, context.shape[0]))
-                pred = model.sample(n=n_eval, context=context[:n_eval], steps=int(min(64, trajs.shape[1])))
+                pred = model.sample(n=n_eval, context=context[:n_eval], steps=int(min(64, trajs.shape[1])), H=float(H), enforce_bounds=True)
             samples_true = trajs[:n_eval, -1, :]
             samples_pred = pred.detach().cpu().numpy()
             fig = plot_density_hist2d(samples_true, samples_pred, bins=60)
