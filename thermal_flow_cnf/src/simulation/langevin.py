@@ -6,7 +6,7 @@ from typing import Callable, Tuple, Optional
 import numpy as np
 from tqdm import trange
 
-from .boundary import reflect_y, no_slip_damping
+from .boundary import reflect_y, reflect_y_variable, no_slip_damping
 
 
 def simulate_trajectory(
@@ -45,20 +45,39 @@ def simulate_trajectory(
     traj[0] = x
 
     sigma = np.sqrt(2.0 * float(D) * float(dt))
+    # Substepping and scheme control for robustness
+    substeps = max(1, int(os.environ.get("TFLOW_SUBSTEPS", "1")))
+    scheme = os.environ.get("TFLOW_SDE_SCHEME", "euler").lower()  # "euler" or "milstein"
 
+    varying = hasattr(flow_fn, 'Hx')
+    Hx_func = getattr(flow_fn, 'Hx') if varying else None
     for t in range(1, int(T) + 1):
-        u = np.array(flow_fn(x), dtype=float).reshape(2)
-        # Apply smooth no-slip damping near channel walls in advective component
-        damp = no_slip_damping(x[1], H)
-        u = u * float(damp)
-        noise = sigma * rng.standard_normal(2)
-        x = x + u * dt + noise
-
-        # Reflect only in y-direction at ±H
-        y_reflected, bounced = reflect_y(x[1], H)
-        if bounced:
-            # For a simple elastic reflection, flip the y-step; here we just set y
-            x[1] = y_reflected
+        # perform substeps for stability when velocities are large near walls or dt is big
+        for _ in range(substeps):
+            u = np.array(flow_fn(x), dtype=float).reshape(2)
+            # Apply smooth no-slip damping near channel walls in advective component (use local H(x) if available)
+            if varying and Hx_func is not None:
+                H_loc = float(Hx_func(float(x[0])))
+            else:
+                H_loc = H
+            damp = no_slip_damping(x[1], H_loc)
+            u = u * float(damp)
+            # Euler–Maruyama or Milstein update
+            dts = dt / float(substeps)
+            if scheme == "milstein":
+                # For additive noise with constant sigma, Milstein == Euler; included for extensibility
+                noise = np.sqrt(2.0 * float(D) * dts) * rng.standard_normal(2)
+                x = x + u * dts + noise
+            else:
+                noise = np.sqrt(2.0 * float(D) * dts) * rng.standard_normal(2)
+                x = x + u * dts + noise
+            # Reflect only in y-direction at ±H after each substep (with damped overshoot)
+            if varying and Hx_func is not None:
+                y_reflected, bounced = reflect_y_variable(x[0], x[1], Hx_func, overshoot_damp=0.2)
+            else:
+                y_reflected, bounced = reflect_y(x[1], H, overshoot_damp=0.2)
+            if bounced:
+                x[1] = y_reflected
         traj[t] = x
 
     return np.array(x0, dtype=float).reshape(2), theta, traj

@@ -81,6 +81,8 @@ with st.sidebar:
 
     st.header("MSD Options")
     msd_mode = st.selectbox("MSD Mode", ["total", "transverse", "demeaned"], index=0)
+    st.header("Plot Options")
+    overlay_mode = st.selectbox("Flow overlay", ["quiver", "stream"], index=0, help="Show vector field as quiver or streamlines")
 
 def list_datasets() -> List[str]:
     data_dir = os.path.join("thermal_flow_cnf", "data", "raw")
@@ -165,7 +167,15 @@ with tabs[0]:
         st.write(f"MSD ({msd_mode}): {mean_squared_displacement(trajs, mode=msd_mode):.4f}")
         log(f"[dataset] loaded: {os.path.basename(dataset_path)} | trajs={trajs.shape}")
         # Recompute flow_fn using current sidebar parameters to reflect latest selection
-        fig = plot_trajectories(trajs, flow_fn=build_flow(flow), H=H, n_show=50, init_mean=init_mean_loaded, init_cov=init_cov_loaded)
+        fig = plot_trajectories(
+            trajs,
+            flow_fn=build_flow(flow),
+            H=H,
+            n_show=50,
+            init_mean=init_mean_loaded,
+            init_cov=init_cov_loaded,
+            flow_overlay_mode=overlay_mode,
+        )
         st.pyplot(fig, clear_figure=True)
 
 with tabs[1]:

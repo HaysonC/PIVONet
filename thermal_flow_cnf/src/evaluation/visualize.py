@@ -9,7 +9,7 @@ from io import BytesIO
 import base64
 
 
-def _plot_flow_overlay(ax, flow_fn, xlim, ylim, density: int = 20):
+def _plot_flow_overlay(ax, flow_fn, xlim, ylim, density: int = 20, mode: str = "quiver"):
     if flow_fn is None:
         return
     xs = np.linspace(xlim[0], xlim[1], density)
@@ -22,7 +22,18 @@ def _plot_flow_overlay(ax, flow_fn, xlim, ylim, density: int = 20):
             u = flow_fn(np.array([X[i, j], Y[i, j]]))
             U[i, j] = u[0]
             V[i, j] = u[1] if len(u) > 1 else 0.0
-    ax.quiver(X, Y, U, V, color='lightgray', alpha=0.7)
+    speed = np.sqrt(U**2 + V**2)
+    if mode == "stream":
+        # Use streamplot colored by speed
+        strm = ax.streamplot(X, Y, U, V, color=speed, cmap='Greys', density=1.0, arrowsize=1.0, linewidth=1.0)
+        # add a light colorbar only if axes belong to a figure with space
+        try:
+            cb = plt.colorbar(strm.lines, ax=ax, fraction=0.046, pad=0.04)
+            cb.set_label('|u|')
+        except Exception:
+            pass
+    else:
+        ax.quiver(X, Y, U, V, speed, cmap='Greys', alpha=0.8)
 
 
 def _ellipse_from_gaussian(mean: np.ndarray, cov: np.ndarray, n_std: float = 2.0, **kwargs):
@@ -34,7 +45,18 @@ def _ellipse_from_gaussian(mean: np.ndarray, cov: np.ndarray, n_std: float = 2.0
     return Ellipse(xy=(float(mean[0]), float(mean[1])), width=float(width), height=float(height), angle=float(theta), fill=False, **kwargs)
 
 
-def plot_trajectories(trajs: np.ndarray, flow_fn=None, H: float | None = None, n_show: int = 50, init_mean: np.ndarray | None = None, init_cov: np.ndarray | None = None):
+def _draw_varying_channel(ax, flow_fn, xlim, steps: int = 200, color: str = 'k', alpha: float = 0.5):
+    """Draw top and bottom boundaries if flow_fn exposes Hx (varying channel)."""
+    if flow_fn is None or not hasattr(flow_fn, 'Hx'):
+        return
+    Hx = getattr(flow_fn, 'Hx')
+    xs = np.linspace(xlim[0], xlim[1], steps)
+    top = [Hx(x) for x in xs]
+    bot = [-Hx(x) for x in xs]
+    ax.plot(xs, top, color=color, linestyle='--', linewidth=1.2, alpha=alpha)
+    ax.plot(xs, bot, color=color, linestyle='--', linewidth=1.2, alpha=alpha)
+
+def plot_trajectories(trajs: np.ndarray, flow_fn=None, H: float | None = None, n_show: int = 50, init_mean: np.ndarray | None = None, init_cov: np.ndarray | None = None, flow_overlay_mode: str = "quiver"):
     fig, ax = plt.subplots(figsize=(6, 4))
     N = min(n_show, trajs.shape[0])
     idx = np.linspace(0, trajs.shape[0] - 1, N).astype(int)
@@ -42,14 +64,16 @@ def plot_trajectories(trajs: np.ndarray, flow_fn=None, H: float | None = None, n
     ys = trajs[:, :, 1]
     xlim = [float(xs.min()), float(xs.max())]
     ylim = [float(ys.min()), float(ys.max())]
-    _plot_flow_overlay(ax, flow_fn, xlim, ylim)
+    _plot_flow_overlay(ax, flow_fn, xlim, ylim, mode=flow_overlay_mode)
     for i in idx:
         ax.plot(trajs[i, :, 0], trajs[i, :, 1], alpha=0.6)
     if init_mean is not None and init_cov is not None:
         ell = _ellipse_from_gaussian(np.asarray(init_mean).reshape(2), np.asarray(init_cov).reshape(2, 2), n_std=2.0, edgecolor='red', linewidth=1.5)
         ax.add_patch(ell)
         ax.scatter([init_mean[0]], [init_mean[1]], color='red', s=20, label='Initial mean')
-    if H is not None:
+    if hasattr(flow_fn, 'boundary_type') and getattr(flow_fn, 'boundary_type') == 'varying-channel':
+        _draw_varying_channel(ax, flow_fn, xlim)
+    elif H is not None:
         ax.axhline(H, color='k', linestyle='--', linewidth=1)
         ax.axhline(-H, color='k', linestyle='--', linewidth=1)
     ax.set_xlabel('x (position)')
@@ -130,7 +154,9 @@ def animate_trajectories(
             lbl = 'Pred' if k == 0 else '_nolegend_'
             lines_pred.append(ax.plot([], [], color='tab:orange', alpha=0.85, linewidth=1.2, label=lbl)[0])
 
-    if H is not None:
+    if hasattr(flow_fn, 'boundary_type') and getattr(flow_fn, 'boundary_type') == 'varying-channel':
+        _draw_varying_channel(ax, flow_fn, xlim)
+    elif H is not None:
         ax.axhline(H, color='k', linestyle='--', linewidth=1)
         ax.axhline(-H, color='k', linestyle='--', linewidth=1)
     ax.set_xlim(xlim[0], xlim[1])

@@ -10,12 +10,13 @@ from typing import Tuple, cast
 
 
 class ODEFunc(nn.Module):
-    def __init__(self, dim: int, cond_dim: int, hidden_dim: int = 64, depth: int = 3, dropout_p: float = 0.0):
+    def __init__(self, dim: int, cond_dim: int, hidden_dim: int = 64, depth: int = 3, dropout_p: float = 0.0, trace_samples: int = 1):
         super().__init__()
         self.dim = dim
         self.cond_dim = cond_dim
         self.net = MLP(dim + cond_dim + 1, dim, hidden_dim, depth=depth, dropout_p=dropout_p)
         self._context: torch.Tensor | None = None
+        self.trace_samples = int(max(1, trace_samples))
 
     def set_context(self, context: torch.Tensor):
         # context: (B, cond_dim)
@@ -30,15 +31,22 @@ class ODEFunc(nn.Module):
         t = t.to(device=z.device, dtype=z.dtype)
         tfeat = torch.ones(B, 1, device=z.device, dtype=z.dtype) * t
         context = self._context.to(device=z.device, dtype=z.dtype)
-        inp = torch.cat([z, context, tfeat], dim=1)
-        f = self.net(inp)
-        # Hutchinson trace estimator
-        with torch.set_grad_enabled(True):
-            z.requires_grad_(True)
-            eps = torch.randn_like(z)
-            f_eps = (self.net(torch.cat([z, context.detach(), tfeat.detach()], dim=1)) * eps).sum()
-            grad = torch.autograd.grad(f_eps, z, create_graph=True)[0]
-            div = (grad * eps).sum(dim=1, keepdim=True)
+        # Fast path for inference/no_grad to avoid autograd graph creation
+        if not torch.is_grad_enabled():
+            f = self.net(torch.cat([z, context, tfeat], dim=1))
+            dlogp_dt = torch.zeros(B, 1, device=z.device, dtype=z.dtype)
+            return f, dlogp_dt
+
+        # Training / grad-enabled path
+        z_req = z.requires_grad_(True)
+        f = self.net(torch.cat([z_req, context, tfeat], dim=1))
+        div_terms = []
+        for k in range(self.trace_samples):
+            eps = torch.randn_like(z_req)
+            f_eps = (f * eps).sum()
+            grad = torch.autograd.grad(f_eps, z_req, create_graph=(k < self.trace_samples - 1), retain_graph=(k < self.trace_samples - 1))[0]
+            div_terms.append((grad * eps).sum(dim=1, keepdim=True))
+        div = torch.stack(div_terms, dim=0).mean(dim=0)
         dlogp_dt = -div
         return f, dlogp_dt
 
@@ -82,14 +90,14 @@ class CNF(nn.Module):
             traj_z.append(z)
             traj_lp.append(lp)
         return torch.stack(traj_z, dim=0), torch.stack(traj_lp, dim=0)
-    def __init__(self, dim: int, cond_dim: int, hidden_dim: int = 64, depth: int = 3, dropout_p: float = 0.0):
+    def __init__(self, dim: int, cond_dim: int, hidden_dim: int = 64, depth: int = 3, dropout_p: float = 0.0, trace_samples: int = 1):
         super().__init__()
         self.dim = dim
         self.cond_dim = cond_dim
         self.hidden_dim = hidden_dim
-        self.func = ODEFunc(dim, cond_dim, hidden_dim, depth=depth, dropout_p=dropout_p)
+        self.func = ODEFunc(dim, cond_dim, hidden_dim, depth=depth, dropout_p=dropout_p, trace_samples=trace_samples)
 
-    def flow(self, x: torch.Tensor, context: torch.Tensor, t0: float = 1.0, t1: float = 0.0, steps: int = 10, stochastic_steps_jitter: int = 0) -> tuple[torch.Tensor, torch.Tensor]:
+    def flow(self, x: torch.Tensor, context: torch.Tensor, t0: float = 1.0, t1: float = 0.0, steps: int = 10, stochastic_steps_jitter: int = 0, solver: str = "dopri5", rtol: float = 1e-5, atol: float = 1e-5) -> tuple[torch.Tensor, torch.Tensor]:
         # Integrate from data time t0 to base time t1 (usually 1->0)
         B = x.size(0)
         device = x.device
@@ -108,16 +116,16 @@ class CNF(nn.Module):
             # Use fixed-step RK4 on MPS to avoid dtype issues inside torchdiffeq
             res = self._integrate_fixed(x, logp0, tspan)
         else:
-            res = odeint_adj(self.func, (x, logp0), tspan, atol=1e-5, rtol=1e-5)
+            res = odeint_adj(self.func, (x, logp0), tspan, atol=atol, rtol=rtol, method=solver)
         z_traj, logp_traj = cast(tuple[torch.Tensor, torch.Tensor], res)
         # Each is (T, B, D) and (T, B, 1)
         z1 = z_traj[-1]
         logp1 = logp_traj[-1]
         return z1, logp1
 
-    def log_prob(self, x: torch.Tensor, context: torch.Tensor, base_std: float = 1.0, steps: int = 10, stochastic_steps_jitter: int = 0):
+    def log_prob(self, x: torch.Tensor, context: torch.Tensor, base_std: float = 1.0, steps: int = 10, stochastic_steps_jitter: int = 0, solver: str = "dopri5", rtol: float = 1e-5, atol: float = 1e-5):
         # Map x -> z and accumulate logp; base is N(0, I)
-        z, delta_logp = self.flow(x, context, t0=1.0, t1=0.0, steps=steps, stochastic_steps_jitter=stochastic_steps_jitter)
+        z, delta_logp = self.flow(x, context, t0=1.0, t1=0.0, steps=steps, stochastic_steps_jitter=stochastic_steps_jitter, solver=solver, rtol=rtol, atol=atol)
         base_logprob = -0.5 * ((z / base_std) ** 2).sum(dim=1, keepdim=True) - 0.5 * self.dim * torch.log(
             torch.tensor(2 * torch.pi, device=x.device, dtype=x.dtype)
         ) - self.dim * torch.log(torch.tensor(base_std, device=x.device, dtype=x.dtype))
