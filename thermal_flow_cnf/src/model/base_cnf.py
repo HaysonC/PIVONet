@@ -10,11 +10,11 @@ from typing import Tuple, cast
 
 
 class ODEFunc(nn.Module):
-    def __init__(self, dim: int, cond_dim: int, hidden_dim: int = 64, dropout_p: float = 0.0):
+    def __init__(self, dim: int, cond_dim: int, hidden_dim: int = 64, depth: int = 3, dropout_p: float = 0.0):
         super().__init__()
         self.dim = dim
         self.cond_dim = cond_dim
-        self.net = MLP(dim + cond_dim + 1, dim, hidden_dim, dropout_p=dropout_p)
+        self.net = MLP(dim + cond_dim + 1, dim, hidden_dim, depth=depth, dropout_p=dropout_p)
         self._context: torch.Tensor | None = None
 
     def set_context(self, context: torch.Tensor):
@@ -44,6 +44,24 @@ class ODEFunc(nn.Module):
 
 
 class CNF(nn.Module):
+    def eval_field(self, z: torch.Tensor, context: torch.Tensor, t: float = 1.0) -> torch.Tensor:
+        """Evaluate learned vector field f(t, z | context) at a scalar time t.
+
+        Args:
+            z: (B, dim)
+            context: (B, cond_dim)
+            t: scalar time in [0,1]
+        Returns:
+            f: (B, dim)
+        """
+        device = z.device
+        dtype = z.dtype if z.dtype in (torch.float32, torch.float16, torch.bfloat16) else torch.float32
+        z = z.to(device=device, dtype=dtype)
+        context = context.to(device=device, dtype=dtype)
+        self.func.set_context(context)
+        logp0 = torch.zeros(z.size(0), 1, device=device, dtype=dtype)
+        f, _ = self.func(torch.tensor(float(t), device=device, dtype=dtype), (z, logp0))
+        return f
     def _integrate_fixed(self, x: torch.Tensor, logp: torch.Tensor, tspan: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         # Fixed-step RK4 integrator compatible with autograd
         assert tspan.ndim == 1 and tspan.numel() >= 2
@@ -64,12 +82,12 @@ class CNF(nn.Module):
             traj_z.append(z)
             traj_lp.append(lp)
         return torch.stack(traj_z, dim=0), torch.stack(traj_lp, dim=0)
-    def __init__(self, dim: int, cond_dim: int, hidden_dim: int = 64, dropout_p: float = 0.0):
+    def __init__(self, dim: int, cond_dim: int, hidden_dim: int = 64, depth: int = 3, dropout_p: float = 0.0):
         super().__init__()
         self.dim = dim
         self.cond_dim = cond_dim
         self.hidden_dim = hidden_dim
-        self.func = ODEFunc(dim, cond_dim, hidden_dim, dropout_p=dropout_p)
+        self.func = ODEFunc(dim, cond_dim, hidden_dim, depth=depth, dropout_p=dropout_p)
 
     def flow(self, x: torch.Tensor, context: torch.Tensor, t0: float = 1.0, t1: float = 0.0, steps: int = 10, stochastic_steps_jitter: int = 0) -> tuple[torch.Tensor, torch.Tensor]:
         # Integrate from data time t0 to base time t1 (usually 1->0)
@@ -146,6 +164,38 @@ class CNF(nn.Module):
         else:
             z_traj, _ = cast(tuple[torch.Tensor, torch.Tensor], odeint_adj(self.func, (z0, logp0), tspan, atol=1e-5, rtol=1e-5))
         # z_traj: (T, B, D) -> return (B, T, D)
+        out = z_traj.permute(1, 0, 2).contiguous()
+        if enforce_bounds and H is not None:
+            y = out[:, :, 1]
+            y = torch.where(y > H, 2 * H - y, y)
+            y = torch.where(y < -H, -2 * H - y, y)
+            out = torch.stack([out[:, :, 0], y], dim=2)
+        return out
+
+    @torch.no_grad()
+    def rollout_from(self, x0: torch.Tensor, context: torch.Tensor, steps: int = 50, H: float | None = None, enforce_bounds: bool = True) -> torch.Tensor:
+        """Generate trajectories starting from given initial positions x0 following learned field.
+
+        Args:
+            x0: (B, dim) initial positions in data space
+            context: (B, cond_dim)
+            steps: number of integration steps between t in [0,1]
+            H: optional half-height to reflect y within [-H,H]
+            enforce_bounds: if True, apply simple reflecting bounds in y
+        Returns:
+            (B, steps, dim) trajectory including the initial state as step 0
+        """
+        device = x0.device
+        dtype = x0.dtype if x0.dtype in (torch.float32, torch.float16, torch.bfloat16) else torch.float32
+        x0 = x0.to(device=device, dtype=dtype)
+        context = context.to(device=device, dtype=dtype)
+        self.func.set_context(context)
+        tspan = torch.linspace(0.0, 1.0, steps=max(2, int(steps)), device=device, dtype=dtype)
+        logp0 = torch.zeros(x0.size(0), 1, device=device, dtype=dtype)
+        if device.type == "mps":
+            z_traj, _ = self._integrate_fixed(x0, logp0, tspan)
+        else:
+            z_traj, _ = cast(tuple[torch.Tensor, torch.Tensor], odeint_adj(self.func, (x0, logp0), tspan, atol=1e-5, rtol=1e-5))
         out = z_traj.permute(1, 0, 2).contiguous()
         if enforce_bounds and H is not None:
             y = out[:, :, 1]

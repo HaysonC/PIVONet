@@ -8,7 +8,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import torch
 from thermal_flow_cnf.src.config import CONFIG
-from thermal_flow_cnf.src.flows import uniform_flow, couette_flow, poiseuille_flow
+from thermal_flow_cnf.src.flows import poiseuille_flow, diffuser_flow, compressor_flow, bend_flow
 from thermal_flow_cnf.src.simulation.langevin import simulate_dataset
 from thermal_flow_cnf.src.simulation.dataset import TrajectoryDataset
 from thermal_flow_cnf.src.evaluation.visualize import plot_trajectories, plot_density_hist2d, animate_trajectories, animation_to_html
@@ -51,15 +51,20 @@ st.title("Thermal Flow CNF: Simulate, Train, Visualize")
 # Sidebar controls
 with st.sidebar:
     st.header("Simulation Settings")
-    flow = st.selectbox("Flow", ["uniform", "couette", "poiseuille"], index=2)
+    flow = st.selectbox("Flow", ["poiseuille", "diffuser", "compressor", "bend"], index=0)
     num_particles = st.number_input("Num Particles", value=200, min_value=10, step=10)
     T = st.number_input("Time Steps (T)", value=500, min_value=10, step=10)
     dt = st.number_input("dt", value=CONFIG["dt"], step=0.001, format="%.3f")
     D = st.number_input("D (diffusion)", value=CONFIG["D"], step=0.01, format="%.3f")
     H = st.number_input("H (half-height)", value=CONFIG["H"], step=0.1, format="%.2f")
-    U0 = st.number_input("U0 (uniform)", value=CONFIG["U0"], step=0.1)
-    gamma = st.number_input("gamma (couette)", value=CONFIG["gamma"], step=0.1)
-    Umax = st.number_input("Umax (poiseuille)", value=CONFIG["Umax"], step=0.1)
+    # Flow-specific parameters
+    Umax = st.number_input("Umax (poiseuille/bend)", value=CONFIG["Umax"], step=0.1)
+    L = st.number_input("Length L (diffuser/compressor/bend)", value=1.0, step=0.1, format="%.2f")
+    H_in = st.number_input("H_in (diffuser/compressor)", value=CONFIG["H"], step=0.1, format="%.2f")
+    H_out = st.number_input("H_out (diffuser/compressor)", value=CONFIG["H"], step=0.1, format="%.2f")
+    Umax_in = st.number_input("Umax_in (diffuser/compressor)", value=CONFIG["Umax"], step=0.1)
+    bend_angle = st.number_input("Bend angle (deg)", value=90.0, step=5.0, format="%.1f")
+    mlp_depth = st.number_input("MLP Depth", value=3, min_value=1, max_value=12, step=1)
 
     st.header("Model Settings")
     hidden_dim = st.number_input("Hidden Dim", value=64, min_value=16, step=16)
@@ -92,10 +97,15 @@ def list_checkpoints() -> List[str]:
     return sorted(files, key=lambda p: os.path.getmtime(p))
 
 def build_flow(name: str):
-    if name == "uniform":
-        return uniform_flow(U0)
-    if name == "couette":
-        return couette_flow(gamma)
+    if name == "poiseuille":
+        return poiseuille_flow(Umax, H)
+    if name == "diffuser":
+        return diffuser_flow(Umax_in, H_in, H_out, L=L)
+    if name == "compressor":
+        return compressor_flow(Umax_in, H_in, H_out, L=L)
+    if name == "bend":
+        return bend_flow(Umax, H, bend_angle_deg=bend_angle, L=L)
+    # default
     return poiseuille_flow(Umax, H)
 
 tabs = st.tabs(["Data", "Train", "Inference & Animate", "Metrics", "Logs"])
@@ -164,13 +174,27 @@ with tabs[1]:
     # Stochastic training settings (visible before starting training)
     data_noise_std = st.number_input("Target jitter std (stochastic)", min_value=0.0, max_value=0.5, value=0.0, step=0.01)
     steps_jitter = st.number_input("ODE steps jitter (+/-)", min_value=0, max_value=8, value=0, step=1, help="Randomize ODE steps per batch to regularize")
+    # Physics-informed options
+    st.markdown("### Physics-informed losses")
+    enable_no_slip = st.checkbox("Enable no-slip loss (u=0 at walls)", value=True)
+    no_slip_coef = st.number_input("No-slip loss coeff", min_value=0.0, max_value=10.0, value=1.0, step=0.1)
+    enable_bern = st.checkbox("Enable Bernoulli/Poiseuille shape loss", value=False, help="Encourage consistent kinetic energy / parabolic profile")
+    bern_coef = st.number_input("Bernoulli loss coeff", min_value=0.0, max_value=10.0, value=0.0, step=0.1)
     if dataset_path and st.button("Train CNF", key="train_btn"):
         ds = TrajectoryDataset(dataset_path)
         from torch.utils.data import DataLoader
         dl = DataLoader(ds, batch_size=int(batch), shuffle=True)
         device = selected_device
         log(f"[train] device={device}, hidden_dim={int(hidden_dim)}, dropout={float(dropout_p):.2f}, epochs={int(epochs)}, batch={int(batch)}, noise_std={float(data_noise_std):.3f}, steps_jitter=+/-{int(steps_jitter)}")
-        model = CNF(dim=2, cond_dim=3, hidden_dim=int(hidden_dim), dropout_p=float(dropout_p)).to(device)
+        model = CNF(dim=2, cond_dim=3, hidden_dim=int(hidden_dim), depth=int(mlp_depth), dropout_p=float(dropout_p)).to(device)
+        # Attach physics configuration for training loop
+        # Attach physics configuration (store in plain attribute; torch warns if not registered, so use setattr on object __dict__)
+        object.__setattr__(model, "phys_cfg", {
+            "no_slip_coef": float(no_slip_coef) if enable_no_slip else 0.0,
+            "bernoulli_coef": float(bern_coef) if enable_bern else 0.0,
+            "H": float(H),
+            "mlp_depth": int(mlp_depth),
+        })
         from thermal_flow_cnf.src.model.train import train_cnf
         p_outer = st.progress(0, text="Training epoch 0")
         p_inner = st.progress(0, text="Batch 0")
@@ -239,7 +263,7 @@ with tabs[2]:
         context = torch.from_numpy(np.concatenate([x0s, thetas], axis=1)).to(torch.float32)
         device = selected_device
         context = context.to(device)
-        model = CNF(dim=2, cond_dim=3, hidden_dim=int(hidden_dim), dropout_p=float(dropout_p)).to(device)
+        model = CNF(dim=2, cond_dim=3, hidden_dim=int(hidden_dim), depth=int(mlp_depth), dropout_p=float(dropout_p)).to(device)
         # Load checkpoint if available
         if ckpt_path and os.path.isfile(ckpt_path):
             from thermal_flow_cnf.src.utils.io import load_checkpoint
@@ -259,8 +283,11 @@ with tabs[2]:
         ctx_batch = context[:n_samp]
         log(f"[animate] device={device}, n_true={trajs.shape[0]}, T_true={trajs.shape[1]}, n_pred_req={n_samp}")
         with torch.no_grad():
-            steps_anim = int(min(200, trajs.shape[1]))
-            z_pred = model.sample_trajectories(n=n_samp, context=ctx_batch, steps=steps_anim, H=float(H), enforce_bounds=True)
+            # Match predicted trajectory length to animation frame budget (avoid disappearance)
+            steps_anim = int(min(int(max_frames), trajs.shape[1]))
+            # Use rollout starting from the same initial positions as true trajectories
+            x0_batch = torch.from_numpy(x0s[:n_samp]).to(device=device, dtype=torch.float32)
+            z_pred = model.rollout_from(x0_batch, ctx_batch, steps=steps_anim, H=float(H), enforce_bounds=True)
         trajs_pred = z_pred.detach().cpu().numpy()
         log(f"[animate] pred trajs shape={trajs_pred.shape}")
 
@@ -297,7 +324,7 @@ with tabs[3]:
             x0s = data["x0s"].astype(np.float32)
             thetas = np.zeros((x0s.shape[0], 1), dtype=np.float32)
             context = torch.from_numpy(np.concatenate([x0s, thetas], axis=1)).to(torch.float32).to(selected_device)
-            model = CNF(dim=2, cond_dim=3, hidden_dim=int(hidden_dim), dropout_p=float(dropout_p)).to(selected_device)
+            model = CNF(dim=2, cond_dim=3, hidden_dim=int(hidden_dim), depth=int(mlp_depth), dropout_p=float(dropout_p)).to(selected_device)
             if ckpt_path and os.path.isfile(ckpt_path):
                 from thermal_flow_cnf.src.utils.io import load_checkpoint
                 load_checkpoint(model, optimizer=None, path=ckpt_path)

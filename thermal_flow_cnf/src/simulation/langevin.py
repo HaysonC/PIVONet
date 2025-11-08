@@ -6,7 +6,7 @@ from typing import Callable, Tuple, Optional
 import numpy as np
 from tqdm import trange
 
-from .boundary import reflect_y
+from .boundary import reflect_y, no_slip_damping
 
 
 def simulate_trajectory(
@@ -48,6 +48,9 @@ def simulate_trajectory(
 
     for t in range(1, int(T) + 1):
         u = np.array(flow_fn(x), dtype=float).reshape(2)
+        # Apply smooth no-slip damping near channel walls in advective component
+        damp = no_slip_damping(x[1], H)
+        u = u * float(damp)
         noise = sigma * rng.standard_normal(2)
         x = x + u * dt + noise
 

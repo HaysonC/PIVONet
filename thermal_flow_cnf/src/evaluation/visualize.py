@@ -118,10 +118,17 @@ def animate_trajectories(
         ax.add_patch(ell)
         ax.scatter([init_mean[0]], [init_mean[1]], color='red', s=20, label='Initial mean')
 
-    lines_true = [ax.plot([], [], color='tab:blue', alpha=0.8, label='True')[0] for _ in idx]
+    # Create line objects; only first gets legend label to avoid duplicates
+    lines_true = []
+    for k, _ in enumerate(idx):
+        lbl = 'True' if k == 0 else '_nolegend_'
+        lines_true.append(ax.plot([], [], color='tab:blue', alpha=0.85, linewidth=1.2, label=lbl)[0])
     lines_pred = None
     if trajs_pred is not None:
-        lines_pred = [ax.plot([], [], color='tab:orange', alpha=0.8, label='Pred')[0] for _ in idx]
+        lines_pred = []
+        for k, _ in enumerate(idx):
+            lbl = 'Pred' if k == 0 else '_nolegend_'
+            lines_pred.append(ax.plot([], [], color='tab:orange', alpha=0.85, linewidth=1.2, label=lbl)[0])
 
     if H is not None:
         ax.axhline(H, color='k', linestyle='--', linewidth=1)
@@ -141,19 +148,44 @@ def animate_trajectories(
         return (*lines_true, *(lines_pred or []))
 
     def update(frame):
-        # limit tail length for readability
-        start = max(0, frame - (tail or frame))
+        # Clamp frame separately for true and predicted to prevent disappearance when one sequence is shorter
+        frame_true = int(min(frame, T_true - 1))
+        frame_pred = int(min(frame, T_pred - 1)) if trajs_pred is not None else 0
+        # Tail management
+        if tail is None:
+            start_true = 0
+            start_pred = 0
+        else:
+            start_true = max(0, frame_true - tail)
+            start_pred = max(0, frame_pred - tail)
         for k, i in enumerate(idx):
-            end_true = min(frame, T_true)
-            lines_true[k].set_data(trajs_true[i, start:end_true, 0], trajs_true[i, start:end_true, 1])
+            # True trajectory slice
+            lines_true[k].set_data(
+                trajs_true[i, start_true:frame_true + 1, 0],
+                trajs_true[i, start_true:frame_true + 1, 1],
+            )
+            # Predicted trajectory slice (if available)
             if lines_pred is not None and trajs_pred is not None:
-                end_pred = min(frame, T_pred)
-                lines_pred[k].set_data(trajs_pred[i, start:end_pred, 0], trajs_pred[i, start:end_pred, 1])
+                lines_pred[k].set_data(
+                    trajs_pred[i, start_pred:frame_pred + 1, 0],
+                    trajs_pred[i, start_pred:frame_pred + 1, 1],
+                )
         return (*lines_true, *(lines_pred or []))
 
     # Determine frames sequence to limit total frames for embedding size
     stride = int(frame_stride) if frame_stride is not None else max(1, int(np.ceil(T / max(1, max_frames))))
     frames_seq = list(range(0, T, stride))
+    # Rebuild legend once (duplicate labels suppressed by '_nolegend_')
+    handles, labels = ax.get_legend_handles_labels()
+    uniq = []
+    seen = set()
+    for h, lb in zip(handles, labels):
+        if lb == '_nolegend_' or lb in seen:
+            continue
+        seen.add(lb)
+        uniq.append((h, lb))
+    if uniq:
+        ax.legend([h for h, _ in uniq], [lb for _, lb in uniq], loc='upper right', fontsize=8)
     anim = animation.FuncAnimation(fig, update, frames=frames_seq, init_func=init, interval=interval, blit=True)
     return anim
 
