@@ -51,7 +51,9 @@ st.title("Thermal Flow CNF: Simulate, Train, Visualize")
 # Sidebar controls
 with st.sidebar:
     st.header("Simulation Settings")
-    flow = st.selectbox("Flow", ["poiseuille", "diffuser", "compressor", "bend"], index=0)
+    flow = st.selectbox("Flow", ["poiseuille", "diffuser", "compressor", "bend"], index=0, key="flow_select")
+    # Track flow changes to set sensible defaults for H_in/H_out
+    prev_flow = st.session_state.get("_prev_flow")
     num_particles = st.number_input("Num Particles", value=200, min_value=10, step=10)
     T = st.number_input("Time Steps (T)", value=500, min_value=10, step=10)
     dt = st.number_input("dt", value=CONFIG["dt"], step=0.001, format="%.3f")
@@ -60,8 +62,38 @@ with st.sidebar:
     # Flow-specific parameters
     Umax = st.number_input("Umax (poiseuille/bend)", value=CONFIG["Umax"], step=0.1)
     L = st.number_input("Length L (diffuser/compressor/bend)", value=1.0, step=0.1, format="%.2f")
-    H_in = st.number_input("H_in (diffuser/compressor)", value=CONFIG["H"], step=0.1, format="%.2f")
-    H_out = st.number_input("H_out (diffuser/compressor)", value=CONFIG["H"], step=0.1, format="%.2f")
+    # Persist H_in/H_out in session state to allow auto-adjustment
+    if "H_in" not in st.session_state:
+        st.session_state["H_in"] = float(CONFIG["H"])
+    if "H_out" not in st.session_state:
+        st.session_state["H_out"] = float(CONFIG["H"]) 
+    # When flow changes, set a sensible default relationship between H_in and H_out
+    if prev_flow != flow:
+        if flow == "diffuser":
+            # Make outlet wider than inlet by default
+            st.session_state["H_out"] = max(st.session_state.get("H_out", H) , st.session_state.get("H_in", H) * 1.5)
+        elif flow == "compressor":
+            # Make outlet narrower than inlet by default
+            st.session_state["H_out"] = max(0.05, min(st.session_state.get("H_out", H), st.session_state.get("H_in", H) * 0.7))
+        st.session_state["_prev_flow"] = flow
+    H_in = st.number_input("H_in (diffuser/compressor)", value=float(st.session_state["H_in"]), step=0.1, format="%.2f", key="H_in")
+    H_out = st.number_input("H_out (diffuser/compressor)", value=float(st.session_state["H_out"]), step=0.1, format="%.2f", key="H_out")
+    # Auto-validate and adjust inconsistent H_in/H_out with user feedback
+    adjusted = False
+    if flow == "diffuser":
+        if H_out <= H_in:
+            new_H_out = max(H_in * 1.2, H_in + 0.1)
+            st.session_state["H_out"] = float(new_H_out)
+            H_out = float(new_H_out)
+            st.warning("For a diffuser, H_out should be greater than H_in. Adjusted H_out automatically.")
+            adjusted = True
+    elif flow == "compressor":
+        if H_out >= H_in:
+            new_H_out = max(0.05, min(H_in * 0.8, H_in - 0.1))
+            st.session_state["H_out"] = float(new_H_out)
+            H_out = float(new_H_out)
+            st.warning("For a compressor, H_out should be less than H_in. Adjusted H_out automatically.")
+            adjusted = True
     Umax_in = st.number_input("Umax_in (diffuser/compressor)", value=CONFIG["Umax"], step=0.1)
     bend_angle = st.number_input("Bend angle (deg)", value=90.0, step=5.0, format="%.1f")
     mlp_depth = st.number_input("MLP Depth", value=3, min_value=1, max_value=12, step=1)
@@ -262,6 +294,11 @@ with tabs[2]:
         frame_stride_in = st.number_input("Frame stride (0=auto)", min_value=0, max_value=50, value=0, step=1)
     with cC:
         embed_limit_mb = st.number_input("Embed limit (MB)", min_value=5.0, max_value=200.0, value=20.0, step=1.0)
+        # Finer inference controls
+        infer_steps = st.number_input("Integration steps (fine)", min_value=10, max_value=500, value=150, step=10, help="ODE integration steps for model rollout (higher = smoother trajectory)")
+        infer_solver = st.selectbox("Solver", ["dopri5", "rk4"], index=0)
+        infer_rtol = st.number_input("rtol", min_value=1e-7, max_value=1e-2, value=1e-5, step=1e-6, format="%.1e")
+        infer_atol = st.number_input("atol", min_value=1e-7, max_value=1e-2, value=1e-5, step=1e-6, format="%.1e")
     if dataset_path and st.button("Animate", key="animate_btn"):
         data = np.load(dataset_path)
         trajs = data["trajs"]
@@ -294,7 +331,7 @@ with tabs[2]:
         log(f"[animate] device={device}, n_true={trajs.shape[0]}, T_true={trajs.shape[1]}, n_pred_req={n_samp}")
         with torch.no_grad():
             # Match predicted trajectory length to animation frame budget (avoid disappearance)
-            steps_anim = int(min(int(max_frames), trajs.shape[1]))
+            steps_anim = int(min(int(max_frames), infer_steps))
             # Use rollout starting from the same initial positions as true trajectories
             x0_batch = torch.from_numpy(x0s[:n_samp]).to(device=device, dtype=torch.float32)
             z_pred = model.rollout_from(x0_batch, ctx_batch, steps=steps_anim, H=float(H), enforce_bounds=True)
@@ -310,7 +347,7 @@ with tabs[2]:
                 H=H,
                 n_show=50,
                 interval=25,
-                tail=50,
+                tail=60,
                 init_mean=init_mean_loaded,
                 init_cov=init_cov_loaded,
                 max_frames=int(max_frames),
@@ -321,6 +358,43 @@ with tabs[2]:
         except Exception as e:
             log(f"[animate][error] {type(e).__name__}: {e}")
             st.error(f"Animation failed: {e}")
+
+        st.markdown("### Particle Position Showcase")
+        st.caption("Animate individual particles starting near center, mid-channel, and near boundary for qualitative flow inspection.")
+        showcase_btn = st.button("Showcase Center/Mid/Boundary", key="showcase_btn")
+        if dataset_path and showcase_btn:
+            data = np.load(dataset_path)
+            trajs = data["trajs"]
+            x0s = data["x0s"].astype(np.float32)
+            thetas = np.zeros((x0s.shape[0], 1), dtype=np.float32)
+            context = torch.from_numpy(np.concatenate([x0s, thetas], axis=1)).to(torch.float32)
+            device = selected_device
+            context = context.to(device)
+            model = CNF(dim=2, cond_dim=3, hidden_dim=int(hidden_dim), depth=int(mlp_depth), dropout_p=float(dropout_p)).to(device)
+            if ckpt_path and os.path.isfile(ckpt_path):
+                from thermal_flow_cnf.src.utils.io import load_checkpoint
+                try:
+                    load_checkpoint(model, optimizer=None, path=ckpt_path)
+                    log(f"[showcase] loaded checkpoint: {os.path.basename(ckpt_path)}")
+                except Exception as e:
+                    st.warning(f"Checkpoint incompatible or unreadable, running without loading: {e}")
+                    log(f"[showcase][ckpt-warning] {e}")
+            model.eval()
+            with torch.no_grad():
+                # Pick representative starting points
+                center = torch.tensor([[0.0, 0.0]], device=device, dtype=torch.float32)
+                mid = torch.tensor([[0.2, 0.5 * float(H) * 0.5]], device=device, dtype=torch.float32)  # quarter height
+                boundary = torch.tensor([[0.4, 0.9 * float(H)]], device=device, dtype=torch.float32)
+                reps = torch.cat([center, mid, boundary], dim=0)
+                ctx_rep = torch.zeros(reps.size(0), 3, device=device, dtype=torch.float32)
+                trajs_rep = model.rollout_from(reps, ctx_rep, steps=int(min(infer_steps, 300)), H=float(H), enforce_bounds=True).cpu().numpy()
+            # Build a bespoke pretty animation using existing helper
+            anim_rep = animate_trajectories(
+                trajs_true=trajs_rep, trajs_pred=None, flow_fn=build_flow(flow), H=H, n_show=3,
+                interval=35, tail=80, max_frames=int(max_frames), frame_stride=None,
+            )
+            components.html(animation_to_html(anim_rep, embed_limit_mb=float(embed_limit_mb)), height=420)
+            st.toast("Showcase animation ready", icon="🎯")
 
 with tabs[3]:
     st.subheader("Metrics & Analysis")

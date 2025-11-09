@@ -17,6 +17,15 @@ class ODEFunc(nn.Module):
         self.net = MLP(dim + cond_dim + 1, dim, hidden_dim, depth=depth, dropout_p=dropout_p)
         self._context: torch.Tensor | None = None
         self.trace_samples = int(max(1, trace_samples))
+        # Normalization buffers (z and context)
+        self.register_buffer("z_mu", torch.zeros(1, dim))
+        self.register_buffer("z_sigma", torch.ones(1, dim))
+        self.register_buffer("ctx_mu", torch.zeros(1, cond_dim))
+        self.register_buffer("ctx_sigma", torch.ones(1, cond_dim))
+        # Global output scale (learnable gain)
+        self.out_scale = nn.Parameter(torch.tensor(1.0))
+        # Flag to skip divergence; simple Python attribute (avoid type annotation for lint)
+        self.skip_divergence = False
 
     def set_context(self, context: torch.Tensor):
         # context: (B, cond_dim)
@@ -31,20 +40,31 @@ class ODEFunc(nn.Module):
         t = t.to(device=z.device, dtype=z.dtype)
         tfeat = torch.ones(B, 1, device=z.device, dtype=z.dtype) * t
         context = self._context.to(device=z.device, dtype=z.dtype)
+        # (Optional) normalization currently disabled for stability; treat as identity
+        z_n = z
+        ctx_n = context
         # Fast path for inference/no_grad to avoid autograd graph creation
         if not torch.is_grad_enabled():
-            f = self.net(torch.cat([z, context, tfeat], dim=1))
+            f = self.net(torch.cat([z_n, ctx_n, tfeat], dim=1)) * self.out_scale
             dlogp_dt = torch.zeros(B, 1, device=z.device, dtype=z.dtype)
             return f, dlogp_dt
 
         # Training / grad-enabled path
         z_req = z.requires_grad_(True)
-        f = self.net(torch.cat([z_req, context, tfeat], dim=1))
-        div_terms = []
+        f = self.net(torch.cat([z_req, ctx_n, tfeat], dim=1)) * self.out_scale
+        if getattr(self, "skip_divergence", False):
+            dlogp_dt = torch.zeros(B, 1, device=z.device, dtype=z.dtype)
+            return f, dlogp_dt
+        div_terms: list[torch.Tensor] = []
         for k in range(self.trace_samples):
             eps = torch.randn_like(z_req)
             f_eps = (f * eps).sum()
-            grad = torch.autograd.grad(f_eps, z_req, create_graph=(k < self.trace_samples - 1), retain_graph=(k < self.trace_samples - 1))[0]
+            grad = torch.autograd.grad(
+                f_eps,
+                z_req,
+                create_graph=True,
+                retain_graph=True,
+            )[0]
             div_terms.append((grad * eps).sum(dim=1, keepdim=True))
         div = torch.stack(div_terms, dim=0).mean(dim=0)
         dlogp_dt = -div
@@ -68,7 +88,13 @@ class CNF(nn.Module):
         context = context.to(device=device, dtype=dtype)
         self.func.set_context(context)
         logp0 = torch.zeros(z.size(0), 1, device=device, dtype=dtype)
-        f, _ = self.func(torch.tensor(float(t), device=device, dtype=dtype), (z, logp0))
+        # Skip divergence inside forward for eval-only field queries
+        prev = getattr(self.func, "skip_divergence", False)
+        setattr(self.func, "skip_divergence", True)
+        try:
+            f, _ = self.func(torch.tensor(float(t), device=device, dtype=dtype), (z, logp0))
+        finally:
+            setattr(self.func, "skip_divergence", prev)
         return f
     def _integrate_fixed(self, x: torch.Tensor, logp: torch.Tensor, tspan: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         # Fixed-step RK4 integrator compatible with autograd
@@ -96,6 +122,14 @@ class CNF(nn.Module):
         self.cond_dim = cond_dim
         self.hidden_dim = hidden_dim
         self.func = ODEFunc(dim, cond_dim, hidden_dim, depth=depth, dropout_p=dropout_p, trace_samples=trace_samples)
+
+    def set_normalization(self, z_mu: torch.Tensor, z_sigma: torch.Tensor, ctx_mu: torch.Tensor, ctx_sigma: torch.Tensor):
+        """(Disabled) Previously configured normalization stats. Currently a no-op to avoid buffer typing issues."""
+        return
+
+    def set_output_scale(self, scale: float):
+        with torch.no_grad():
+            self.func.out_scale.fill_(float(scale))
 
     def flow(self, x: torch.Tensor, context: torch.Tensor, t0: float = 1.0, t1: float = 0.0, steps: int = 10, stochastic_steps_jitter: int = 0, solver: str = "dopri5", rtol: float = 1e-5, atol: float = 1e-5) -> tuple[torch.Tensor, torch.Tensor]:
         # Integrate from data time t0 to base time t1 (usually 1->0)
