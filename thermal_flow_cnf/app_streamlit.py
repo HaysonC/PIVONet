@@ -7,13 +7,17 @@ import numpy as np
 import streamlit as st
 import streamlit.components.v1 as components
 import torch
+from torch.utils.data import DataLoader
 from thermal_flow_cnf.src.config import CONFIG
 from thermal_flow_cnf.src.flows import poiseuille_flow, diffuser_flow, compressor_flow, bend_flow
 from thermal_flow_cnf.src.simulation.langevin import simulate_dataset
-from thermal_flow_cnf.src.simulation.dataset import TrajectoryDataset
+from thermal_flow_cnf.src.simulation.dataset import TrajectoryDataset, TrajectorySequenceDataset
 from thermal_flow_cnf.src.evaluation.visualize import plot_trajectories, plot_density_hist2d, animate_trajectories, animation_to_html
 from thermal_flow_cnf.src.evaluation.metrics import mean_squared_displacement, kl_divergence_2d, overlap_ratio
 from thermal_flow_cnf.src.model.base_cnf import CNF
+from thermal_flow_cnf.src.model.variational_sde import VariationalSDEModel
+from thermal_flow_cnf.src.model.train import train_cnf, train_variational_sde
+from thermal_flow_cnf.src.utils.io import load_checkpoint
 
 
 st.set_page_config(page_title="Thermal Flow CNF", layout="wide")
@@ -130,6 +134,13 @@ def list_checkpoints() -> List[str]:
     files = [os.path.join(ckpt_dir, f) for f in os.listdir(ckpt_dir) if f.endswith(".pt")]
     return sorted(files, key=lambda p: os.path.getmtime(p))
 
+def list_vsde_checkpoints() -> List[str]:
+    ckpt_dir = os.path.join("thermal_flow_cnf", "checkpoints", "variational")
+    if not os.path.isdir(ckpt_dir):
+        return []
+    files = [os.path.join(ckpt_dir, f) for f in os.listdir(ckpt_dir) if f.endswith(".pt")]
+    return sorted(files, key=lambda p: os.path.getmtime(p))
+
 def build_flow(name: str):
     if name == "poiseuille":
         return poiseuille_flow(Umax, H)
@@ -224,7 +235,6 @@ with tabs[1]:
     bern_coef = st.number_input("Bernoulli loss coeff", min_value=0.0, max_value=10.0, value=0.0, step=0.1)
     if dataset_path and st.button("Train CNF", key="train_btn"):
         ds = TrajectoryDataset(dataset_path)
-        from torch.utils.data import DataLoader
         dl = DataLoader(ds, batch_size=int(batch), shuffle=True)
         device = selected_device
         log(f"[train] device={device}, hidden_dim={int(hidden_dim)}, dropout={float(dropout_p):.2f}, epochs={int(epochs)}, batch={int(batch)}, noise_std={float(data_noise_std):.3f}, steps_jitter=+/-{int(steps_jitter)}")
@@ -237,7 +247,6 @@ with tabs[1]:
             "H": float(H),
             "mlp_depth": int(mlp_depth),
         })
-        from thermal_flow_cnf.src.model.train import train_cnf
         p_outer = st.progress(0, text="Training epoch 0")
         p_inner = st.progress(0, text="Batch 0")
         def tcb(epoch, epochs, step, total, loss):
@@ -283,6 +292,90 @@ with tabs[1]:
     else:
         st.info("No checkpoints found. You can train a model or run without loading.")
 
+    ckpt_path = st.session_state.get("model_ckpt")
+
+    st.markdown("### Variational SDE (stochastic posterior)")
+    vsde_cols = st.columns(3)
+    with vsde_cols[0]:
+        vsde_epochs = st.number_input("SDE epochs", min_value=1, max_value=200, value=5, step=1)
+    with vsde_cols[1]:
+        vsde_lr = st.number_input("SDE learning rate", value=5e-4, format="%.1e")
+    with vsde_cols[2]:
+        vsde_batch = st.number_input("SDE batch size", min_value=4, max_value=512, value=int(batch), step=4)
+    vsde_cols2 = st.columns(3)
+    with vsde_cols2[0]:
+        vsde_particles = st.number_input("Particles", min_value=1, max_value=16, value=4, step=1)
+    with vsde_cols2[1]:
+        vsde_obs_std = st.number_input("Observation std", min_value=0.001, max_value=0.5, value=0.05, step=0.01, format="%.3f")
+    with vsde_cols2[2]:
+        vsde_steps = st.number_input("SDE steps", min_value=10, max_value=400, value=120, step=10)
+    vsde_cols3 = st.columns(3)
+    with vsde_cols3[0]:
+        vsde_kl = st.number_input("KL warmup", min_value=0.0, max_value=5.0, value=1.0, step=0.1)
+    with vsde_cols3[1]:
+        vsde_ctrl = st.number_input("Control cost scale", min_value=0.0, max_value=10.0, value=1.0, step=0.1)
+    with vsde_cols3[2]:
+        default_ctx_dim = int(st.session_state.get("vsde_ctx_dim", 128))
+        vsde_ctx_dim = st.number_input("Posterior ctx dim", min_value=32, max_value=512, value=default_ctx_dim, step=32)
+
+    if dataset_path and ckpt_path and st.button("Train Variational SDE", key="train_vsde_btn"):
+        ds_seq = TrajectorySequenceDataset(dataset_path)
+        dl_seq = DataLoader(ds_seq, batch_size=int(vsde_batch), shuffle=True)
+        device = selected_device
+        log(
+            f"[vsde-train] device={device}, ctx_dim={int(vsde_ctx_dim)}, particles={int(vsde_particles)}, obs_std={float(vsde_obs_std):.3f}, steps={int(vsde_steps)}, lr={float(vsde_lr):.1e}, epochs={int(vsde_epochs)}"
+        )
+        base_model = CNF(dim=2, cond_dim=3, hidden_dim=int(hidden_dim), depth=int(mlp_depth), dropout_p=float(dropout_p)).to(device)
+        if ckpt_path and os.path.isfile(ckpt_path):
+            load_checkpoint(base_model, optimizer=None, path=ckpt_path)
+            log(f"[vsde-train] loaded CNF checkpoint: {os.path.basename(ckpt_path)}")
+        vsde_model = VariationalSDEModel(
+            base_model,
+            z_dim=2,
+            ctx_dim=int(vsde_ctx_dim),
+            encoder_cfg={"x_dim": 2},
+        ).to(device)
+        vsde_outer = st.progress(0, text="Variational epoch 0")
+        vsde_inner = st.progress(0, text="Batch 0")
+
+        def vsde_cb(epoch, epochs, step, total, loss, stats=None):
+            elbo = stats.get("elbo") if isinstance(stats, dict) else None
+            ctrl = stats.get("control_cost") if isinstance(stats, dict) else None
+            vsde_outer.progress(
+                min(epoch / epochs, 1.0),
+                text=f"Var-SDE epoch {epoch}/{epochs} | loss {loss:.4f} | elbo {elbo if elbo is not None else float('nan'):.4f}",
+            )
+            vsde_inner.progress(min(step / total, 1.0), text=f"Batch {step}/{total} | control {ctrl if ctrl is not None else float('nan'):.4f}")
+            if total > 0 and (step == total or step % max(1, total // 8) == 0):
+                log(f"[vsde-train] epoch {epoch}/{epochs} step {step}/{total} loss={loss:.4f} stats={stats}")
+            if step == total:
+                st.toast(f"Variational epoch {epoch}/{epochs} completed", icon="🌀")
+
+        vsde_ckpt_dir = os.path.join("thermal_flow_cnf", "checkpoints", "variational")
+        os.makedirs(vsde_ckpt_dir, exist_ok=True)
+        train_variational_sde(
+            vsde_model,
+            dl_seq,
+            device=device,
+            epochs=int(vsde_epochs),
+            lr=float(vsde_lr),
+            ckpt_dir=vsde_ckpt_dir,
+            progress_cb=vsde_cb,
+            n_particles=int(vsde_particles),
+            obs_std=float(vsde_obs_std),
+            kl_warmup=float(vsde_kl),
+            control_cost_scale=float(vsde_ctrl),
+            n_integration_steps=int(vsde_steps),
+        )
+        st.success("Variational SDE training finished.")
+        st.session_state["vsde_ctx_dim"] = int(vsde_ctx_dim)
+        vsde_ckpts = list_vsde_checkpoints()
+        if vsde_ckpts:
+            st.session_state["vsde_ckpt"] = vsde_ckpts[-1]
+            log(f"[vsde-train] latest checkpoint: {vsde_ckpts[-1]}")
+    elif dataset_path and not ckpt_path:
+        st.info("Select a CNF checkpoint above to condition the variational SDE trainer.")
+
 with tabs[2]:
     st.subheader("Inference & Animate")
     dataset_path = st.session_state.get("dataset_path")
@@ -299,6 +392,25 @@ with tabs[2]:
         infer_solver = st.selectbox("Solver", ["dopri5", "rk4"], index=0)
         infer_rtol = st.number_input("rtol", min_value=1e-7, max_value=1e-2, value=1e-5, step=1e-6, format="%.1e")
         infer_atol = st.number_input("atol", min_value=1e-7, max_value=1e-2, value=1e-5, step=1e-6, format="%.1e")
+
+    vsde_ckpts = list_vsde_checkpoints()
+    current_vsde = st.session_state.get("vsde_ckpt")
+    if vsde_ckpts:
+        default_vsde = vsde_ckpts.index(current_vsde) if current_vsde in vsde_ckpts else len(vsde_ckpts) - 1
+        sel_vsde = st.selectbox("Select Variational SDE checkpoint", ["<none>"] + vsde_ckpts, index=default_vsde + 1)
+        st.session_state["vsde_ckpt"] = None if sel_vsde == "<none>" else sel_vsde
+    else:
+        st.caption("No variational SDE checkpoints yet — train one in the Train tab to enable stochastic inference.")
+
+    vsde_ckpt_path = st.session_state.get("vsde_ckpt")
+    vsde_eval_cols = st.columns(3)
+    with vsde_eval_cols[0]:
+        vsde_eval_particles = st.number_input("Posterior particles (eval)", min_value=1, max_value=32, value=4, step=1)
+    with vsde_eval_cols[1]:
+        vsde_eval_steps = st.number_input("SDE steps (eval)", min_value=10, max_value=500, value=150, step=10)
+    with vsde_eval_cols[2]:
+        vsde_eval_obs = st.number_input("Obs std (eval)", min_value=0.001, max_value=0.5, value=0.05, step=0.01, format="%.3f")
+    vsde_eval_batch = st.number_input("Eval batch size", min_value=8, max_value=128, value=32, step=8)
     if dataset_path and st.button("Animate", key="animate_btn"):
         data = np.load(dataset_path)
         trajs = data["trajs"]
@@ -313,7 +425,6 @@ with tabs[2]:
         model = CNF(dim=2, cond_dim=3, hidden_dim=int(hidden_dim), depth=int(mlp_depth), dropout_p=float(dropout_p)).to(device)
         # Load checkpoint if available
         if ckpt_path and os.path.isfile(ckpt_path):
-            from thermal_flow_cnf.src.utils.io import load_checkpoint
             try:
                 load_checkpoint(model, optimizer=None, path=ckpt_path)
                 log(f"[animate] loaded checkpoint: {os.path.basename(ckpt_path)}")
@@ -359,6 +470,75 @@ with tabs[2]:
             log(f"[animate][error] {type(e).__name__}: {e}")
             st.error(f"Animation failed: {e}")
 
+    if dataset_path and vsde_ckpt_path and ckpt_path and st.button("Sample Variational Posterior", key="sample_vsde_btn"):
+        device = selected_device
+        data = np.load(dataset_path)
+        init_mean_loaded = data.get("init_mean")
+        init_cov_loaded = data.get("init_cov")
+        ds_seq = TrajectorySequenceDataset(dataset_path)
+        dl_seq = DataLoader(ds_seq, batch_size=int(vsde_eval_batch), shuffle=False)
+        x_seq_batch, t_seq_batch, ctx_batch, mask_batch = next(iter(dl_seq))
+        x_seq_batch = x_seq_batch.to(device=device, dtype=torch.float32)
+        t_seq_batch = t_seq_batch.to(device=device, dtype=torch.float32)
+        ctx_batch = ctx_batch.to(device=device, dtype=torch.float32)
+        mask_batch = mask_batch.to(device=device, dtype=torch.float32)
+
+        base_model = CNF(dim=2, cond_dim=3, hidden_dim=int(hidden_dim), depth=int(mlp_depth), dropout_p=float(dropout_p)).to(device)
+        load_checkpoint(base_model, optimizer=None, path=ckpt_path)
+        vsde_ctx_dim_eval = int(st.session_state.get("vsde_ctx_dim", 128))
+        vsde_model = VariationalSDEModel(
+            base_model,
+            z_dim=2,
+            ctx_dim=vsde_ctx_dim_eval,
+            encoder_cfg={"x_dim": 2},
+        ).to(device)
+        load_checkpoint(vsde_model, optimizer=None, path=vsde_ckpt_path)
+        vsde_model.eval()
+
+        with torch.no_grad():
+            loss_eval, stats_eval = vsde_model.compute_elbo(
+                x_seq_batch,
+                t_seq_batch,
+                context=ctx_batch,
+                mask=mask_batch,
+                n_particles=int(vsde_eval_particles),
+                obs_std=float(vsde_eval_obs),
+                n_integration_steps=int(vsde_eval_steps),
+            )
+            _, traj_samples, _ = vsde_model.sample_posterior(
+                x_seq_batch,
+                t_seq_batch,
+                context=ctx_batch,
+                mask=mask_batch,
+                n_particles=int(vsde_eval_particles),
+                n_integration_steps=int(vsde_eval_steps),
+            )
+
+        traj_mean = traj_samples.mean(dim=1).permute(1, 0, 2).cpu().numpy()
+        traj_true = x_seq_batch.cpu().numpy()
+        n_demo = int(min(25, traj_mean.shape[0]))
+        anim_vsde = animate_trajectories(
+            trajs_true=traj_true[:n_demo],
+            trajs_pred=traj_mean[:n_demo],
+            flow_fn=build_flow(flow),
+            H=H,
+            n_show=n_demo,
+            interval=30,
+            tail=60,
+            init_mean=init_mean_loaded,
+            init_cov=init_cov_loaded,
+            max_frames=int(max_frames),
+            frame_stride=None,
+        )
+        components.html(animation_to_html(anim_vsde, embed_limit_mb=float(embed_limit_mb)), height=420)
+        elbo_est = -float(loss_eval.item())
+        st.write(f"Variational ELBO ≈ {elbo_est:.4f} | log_px={stats_eval['log_px_mean']:.4f} | control={stats_eval['control_cost']:.4f} | KL={stats_eval['kl_z0']:.4f}")
+        log(
+            f"[vsde-eval] elbo={elbo_est:.4f} log_px={stats_eval['log_px_mean']:.4f} control={stats_eval['control_cost']:.4f} kl={stats_eval['kl_z0']:.4f}"
+        )
+    elif dataset_path and vsde_ckpt_path and not ckpt_path:
+        st.warning("Select a CNF checkpoint to pair with the variational posterior sampler.")
+
         st.markdown("### Particle Position Showcase")
         st.caption("Animate individual particles starting near center, mid-channel, and near boundary for qualitative flow inspection.")
         showcase_btn = st.button("Showcase Center/Mid/Boundary", key="showcase_btn")
@@ -372,7 +552,6 @@ with tabs[2]:
             context = context.to(device)
             model = CNF(dim=2, cond_dim=3, hidden_dim=int(hidden_dim), depth=int(mlp_depth), dropout_p=float(dropout_p)).to(device)
             if ckpt_path and os.path.isfile(ckpt_path):
-                from thermal_flow_cnf.src.utils.io import load_checkpoint
                 try:
                     load_checkpoint(model, optimizer=None, path=ckpt_path)
                     log(f"[showcase] loaded checkpoint: {os.path.basename(ckpt_path)}")
@@ -410,7 +589,6 @@ with tabs[3]:
             context = torch.from_numpy(np.concatenate([x0s, thetas], axis=1)).to(torch.float32).to(selected_device)
             model = CNF(dim=2, cond_dim=3, hidden_dim=int(hidden_dim), depth=int(mlp_depth), dropout_p=float(dropout_p)).to(selected_device)
             if ckpt_path and os.path.isfile(ckpt_path):
-                from thermal_flow_cnf.src.utils.io import load_checkpoint
                 load_checkpoint(model, optimizer=None, path=ckpt_path)
                 log(f"[metrics] loaded checkpoint: {os.path.basename(ckpt_path)}")
             model.eval()

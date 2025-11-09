@@ -8,6 +8,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 from tqdm import tqdm
 
 from .base_cnf import CNF
+from .variational_sde import VariationalSDEModel
 from ..utils.io import save_checkpoint
 
 # --- Physics losses (microfluidics) ---
@@ -115,5 +116,65 @@ def train_cnf(
         avg = running / max(1, len(dataloader))
         if ckpt_dir is not None:
             save_checkpoint(model, optim, f"{ckpt_dir}/cnf_epoch{epoch}.pt", epoch=epoch, loss=avg)
+
+    return model
+
+
+def train_variational_sde(
+    model: VariationalSDEModel,
+    dataloader: DataLoader,
+    device: str = "cpu",
+    epochs: int = 10,
+    lr: float = 1e-3,
+    ckpt_dir: str | None = None,
+    progress_cb: Optional[Callable[..., None]] = None,
+    n_particles: int = 4,
+    obs_std: float = 0.05,
+    kl_warmup: float = 1.0,
+    control_cost_scale: float = 1.0,
+    n_integration_steps: int = 50,
+):
+    model = model.to(device)
+    optim = AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=lr)
+    scheduler = CosineAnnealingLR(optim, T_max=max(1, epochs))
+
+    for epoch in range(1, epochs + 1):
+        model.train()
+        running = 0.0
+        total = len(dataloader)
+        for step, batch in enumerate(dataloader, start=1):
+            x_seq, t_seq, context, mask = batch
+            x_seq = x_seq.to(device=device, dtype=torch.float32)
+            t_seq = t_seq.to(device=device, dtype=torch.float32)
+            context = context.to(device=device, dtype=torch.float32)
+            mask_tensor = mask.to(device=device, dtype=torch.float32) if isinstance(mask, torch.Tensor) else None
+
+            optim.zero_grad(set_to_none=True)
+            loss, stats = model.compute_elbo(
+                x_seq,
+                t_seq,
+                context=context,
+                mask=mask_tensor,
+                n_particles=n_particles,
+                obs_std=obs_std,
+                kl_warmup=kl_warmup,
+                control_cost_scale=control_cost_scale,
+                n_integration_steps=n_integration_steps,
+            )
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            optim.step()
+
+            running += float(loss.item())
+            if progress_cb is not None:
+                try:
+                    progress_cb(epoch, epochs, step, total, float(loss.item()), stats)
+                except TypeError:
+                    progress_cb(epoch, epochs, step, total, float(loss.item()))
+
+        scheduler.step()
+        avg_loss = running / max(1, total)
+        if ckpt_dir is not None:
+            save_checkpoint(model, optim, f"{ckpt_dir}/vsde_epoch{epoch}.pt", epoch=epoch, loss=avg_loss)
 
     return model
