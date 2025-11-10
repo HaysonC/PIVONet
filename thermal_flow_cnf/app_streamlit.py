@@ -18,6 +18,9 @@ from thermal_flow_cnf.src.model.base_cnf import CNF
 from thermal_flow_cnf.src.model.variational_sde import VariationalSDEModel
 from thermal_flow_cnf.src.model.train import train_cnf, train_variational_sde
 from thermal_flow_cnf.src.utils.io import load_checkpoint
+from thermal_flow_cnf.src.utils.data_manager import (
+    save_simulation_data, save_training_data, save_animation_metadata
+)
 
 
 st.set_page_config(page_title="Thermal Flow CNF", layout="wide")
@@ -194,6 +197,28 @@ with tabs[0]:
         )
         st.success(f"Saved dataset: {path}")
         log(f"[simulate] saved: {path}")
+        
+        # Save simulation data to current/sim_data.csv with history backup
+        try:
+            data = np.load(path)
+            trajs = data["trajs"]
+            x0s = data["x0s"]
+            sim_params = {
+                "flow": flow,
+                "num_particles": int(num_particles),
+                "T": int(T),
+                "dt": float(dt),
+                "D": float(D),
+                "H": float(H),
+                "Umax": float(Umax),
+                "init_dist": init_dist,
+            }
+            save_simulation_data(trajs, x0s, sim_params, backup=True)
+            st.toast("Saved to data/current/sim_data.csv", icon="💾")
+            log("[simulate] saved sim_data.csv to current/")
+        except Exception as e:
+            st.warning(f"Could not save CSV: {e}")
+            log(f"[simulate] CSV save error: {e}")
     datasets = list_datasets()
     current_dataset = st.session_state.get("dataset_path")
     default_idx = 0
@@ -249,12 +274,27 @@ with tabs[1]:
         })
         p_outer = st.progress(0, text="Training epoch 0")
         p_inner = st.progress(0, text="Batch 0")
+        
+        # Track training logs for CSV export
+        training_log = []
+        
         def tcb(epoch, epochs, step, total, loss):
             dim = 2
             avg_logp = -loss
             bpd = (loss / dim) / np.log(2) if dim > 0 else float('nan')
             p_outer.progress(min(epoch/epochs, 1.0), text=f"Training epoch {epoch}/{epochs} | NLL {loss:.4f} | avg logp {avg_logp:.4f} | bpd {bpd:.3f}")
             p_inner.progress(min(step/total, 1.0), text=f"Batch {step}/{total}")
+            
+            # Record training data
+            training_log.append({
+                'epoch': epoch,
+                'step': step,
+                'total_steps': total,
+                'loss': loss,
+                'avg_logp': avg_logp,
+                'bpd': bpd
+            })
+            
             # Light logging every 10% of the epoch steps
             if total > 0 and (step == total or step % max(1, total // 10) == 0):
                 log(f"[train] epoch {epoch}/{epochs} step {step}/{total} NLL={loss:.4f} avg_logp={avg_logp:.4f} bpd={bpd:.3f}")
@@ -275,6 +315,26 @@ with tabs[1]:
         )
         st.success("Training finished.")
         log("[train] finished")
+        
+        # Save training data to current/train_data.csv with history backup
+        try:
+            final_metrics = {
+                "total_epochs": int(epochs),
+                "batch_size": int(batch),
+                "learning_rate": CONFIG["lr"],
+                "hidden_dim": int(hidden_dim),
+                "dropout": float(dropout_p),
+                "device": device,
+                "data_noise_std": float(data_noise_std),
+                "steps_jitter": int(steps_jitter),
+            }
+            save_training_data(training_log, final_metrics, backup=True)
+            st.toast("Saved to data/current/train_data.csv", icon="💾")
+            log("[train] saved train_data.csv to current/")
+        except Exception as e:
+            st.warning(f"Could not save training CSV: {e}")
+            log(f"[train] CSV save error: {e}")
+        
         # Update last checkpoint selection
         ckpts = list_checkpoints()
         if ckpts:
@@ -484,6 +544,52 @@ with tabs[2]:
             )
             components.html(animation_to_html(anim, embed_limit_mb=float(embed_limit_mb)), height=420)
             st.toast("Animation ready", icon="🎞️")
+            
+            # Save animation metadata to current/meta_data.csv with history backup
+            try:
+                # Calculate trajectory statistics
+                msd_true = mean_squared_displacement(trajs[:n_samp], mode=msd_mode)
+                msd_pred = mean_squared_displacement(trajs_pred, mode=msd_mode)
+                
+                trajectory_stats = {
+                    'msd_true': float(msd_true),
+                    'msd_pred': float(msd_pred),
+                    'true_x_min': float(trajs[:n_samp, :, 0].min()),
+                    'true_x_max': float(trajs[:n_samp, :, 0].max()),
+                    'true_y_min': float(trajs[:n_samp, :, 1].min()),
+                    'true_y_max': float(trajs[:n_samp, :, 1].max()),
+                    'pred_x_min': float(trajs_pred[:, :, 0].min()),
+                    'pred_x_max': float(trajs_pred[:, :, 0].max()),
+                    'pred_y_min': float(trajs_pred[:, :, 1].min()),
+                    'pred_y_max': float(trajs_pred[:, :, 1].max()),
+                }
+                
+                model_params = {
+                    'hidden_dim': int(hidden_dim),
+                    'mlp_depth': int(mlp_depth),
+                    'dropout': float(dropout_p),
+                    'infer_steps': int(steps_anim),
+                    'solver': infer_solver,
+                    'rtol': float(infer_rtol),
+                    'atol': float(infer_atol),
+                    'checkpoint': os.path.basename(ckpt_path) if ckpt_path else 'none',
+                    'flow': flow,
+                    'H': float(H),
+                }
+                
+                save_animation_metadata(
+                    n_true_particles=trajs.shape[0],
+                    n_pred_particles=trajs_pred.shape[0],
+                    n_frames=int(max_frames),
+                    trajectory_stats=trajectory_stats,
+                    model_params=model_params,
+                    backup=True
+                )
+                st.toast("Saved to data/current/meta_data.csv", icon="💾")
+                log("[animate] saved meta_data.csv to current/")
+            except Exception as e:
+                st.warning(f"Could not save metadata CSV: {e}")
+                log(f"[animate] CSV save error: {e}")
         except Exception as e:
             log(f"[animate][error] {type(e).__name__}: {e}")
             st.error(f"Animation failed: {e}")
