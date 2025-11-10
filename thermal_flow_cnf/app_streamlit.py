@@ -306,7 +306,7 @@ with tabs[1]:
     with vsde_cols2[0]:
         vsde_particles = st.number_input("Particles", min_value=1, max_value=16, value=4, step=1)
     with vsde_cols2[1]:
-        vsde_obs_std = st.number_input("Observation std", min_value=0.001, max_value=0.5, value=0.05, step=0.01, format="%.3f")
+        vsde_obs_std_start = st.number_input("Obs std start", min_value=0.001, max_value=0.5, value=0.15, step=0.01, format="%.3f")
     with vsde_cols2[2]:
         vsde_steps = st.number_input("SDE steps", min_value=10, max_value=400, value=120, step=10)
     vsde_cols3 = st.columns(3)
@@ -317,13 +317,20 @@ with tabs[1]:
     with vsde_cols3[2]:
         default_ctx_dim = int(st.session_state.get("vsde_ctx_dim", 128))
         vsde_ctx_dim = st.number_input("Posterior ctx dim", min_value=32, max_value=512, value=default_ctx_dim, step=32)
+    vsde_cols4 = st.columns(3)
+    with vsde_cols4[0]:
+        vsde_obs_std_final = st.number_input("Obs std final", min_value=0.001, max_value=0.5, value=0.05, step=0.01, format="%.3f")
+    with vsde_cols4[1]:
+        vsde_diff_learn = st.checkbox("Learn diffusion", value=True)
+    with vsde_cols4[2]:
+        vsde_initial_log_diff = st.number_input("Initial log diff", value=-1.0, step=0.1, format="%.2f")
 
     if dataset_path and ckpt_path and st.button("Train Variational SDE", key="train_vsde_btn"):
         ds_seq = TrajectorySequenceDataset(dataset_path)
         dl_seq = DataLoader(ds_seq, batch_size=int(vsde_batch), shuffle=True)
         device = selected_device
         log(
-            f"[vsde-train] device={device}, ctx_dim={int(vsde_ctx_dim)}, particles={int(vsde_particles)}, obs_std={float(vsde_obs_std):.3f}, steps={int(vsde_steps)}, lr={float(vsde_lr):.1e}, epochs={int(vsde_epochs)}"
+            f"[vsde-train] device={device}, ctx_dim={int(vsde_ctx_dim)}, particles={int(vsde_particles)}, obs_std_sched=({float(vsde_obs_std_start):.3f}->{float(vsde_obs_std_final):.3f}), steps={int(vsde_steps)}, lr={float(vsde_lr):.1e}, epochs={int(vsde_epochs)}"
         )
         base_model = CNF(dim=2, cond_dim=3, hidden_dim=int(hidden_dim), depth=int(mlp_depth), dropout_p=float(dropout_p)).to(device)
         if ckpt_path and os.path.isfile(ckpt_path):
@@ -334,16 +341,20 @@ with tabs[1]:
             z_dim=2,
             ctx_dim=int(vsde_ctx_dim),
             encoder_cfg={"x_dim": 2},
+            diffusion_learnable=vsde_diff_learn,
+            initial_log_diff=float(vsde_initial_log_diff),
         ).to(device)
         vsde_outer = st.progress(0, text="Variational epoch 0")
         vsde_inner = st.progress(0, text="Batch 0")
 
         def vsde_cb(epoch, epochs, step, total, loss, stats=None):
+            stats = stats or {}
             elbo = stats.get("elbo") if isinstance(stats, dict) else None
             ctrl = stats.get("control_cost") if isinstance(stats, dict) else None
+            obs_std_cur = stats.get("obs_std") if isinstance(stats, dict) else None
             vsde_outer.progress(
                 min(epoch / epochs, 1.0),
-                text=f"Var-SDE epoch {epoch}/{epochs} | loss {loss:.4f} | elbo {elbo if elbo is not None else float('nan'):.4f}",
+                text=f"Var-SDE epoch {epoch}/{epochs} | loss {loss:.4f} | elbo {elbo if elbo is not None else float('nan'):.4f} | obsσ {obs_std_cur if obs_std_cur is not None else float('nan'):.3f}",
             )
             vsde_inner.progress(min(step / total, 1.0), text=f"Batch {step}/{total} | control {ctrl if ctrl is not None else float('nan'):.4f}")
             if total > 0 and (step == total or step % max(1, total // 8) == 0):
@@ -362,13 +373,19 @@ with tabs[1]:
             ckpt_dir=vsde_ckpt_dir,
             progress_cb=vsde_cb,
             n_particles=int(vsde_particles),
-            obs_std=float(vsde_obs_std),
+            obs_std=float(vsde_obs_std_final),
+            obs_std_start=float(vsde_obs_std_start),
+            obs_std_final=float(vsde_obs_std_final),
             kl_warmup=float(vsde_kl),
             control_cost_scale=float(vsde_ctrl),
             n_integration_steps=int(vsde_steps),
         )
         st.success("Variational SDE training finished.")
         st.session_state["vsde_ctx_dim"] = int(vsde_ctx_dim)
+        st.session_state["vsde_diff_learn"] = bool(vsde_diff_learn)
+        st.session_state["vsde_initial_log_diff"] = float(vsde_initial_log_diff)
+        st.session_state["vsde_obs_std_start"] = float(vsde_obs_std_start)
+        st.session_state["vsde_obs_std_final"] = float(vsde_obs_std_final)
         vsde_ckpts = list_vsde_checkpoints()
         if vsde_ckpts:
             st.session_state["vsde_ckpt"] = vsde_ckpts[-1]
@@ -411,6 +428,7 @@ with tabs[2]:
     with vsde_eval_cols[2]:
         vsde_eval_obs = st.number_input("Obs std (eval)", min_value=0.001, max_value=0.5, value=0.05, step=0.01, format="%.3f")
     vsde_eval_batch = st.number_input("Eval batch size", min_value=8, max_value=128, value=32, step=8)
+    vsde_eval_anchor_noise = st.number_input("Anchor noise", min_value=0.0, max_value=0.5, value=0.02, step=0.01, format="%.2f")
     if dataset_path and st.button("Animate", key="animate_btn"):
         data = np.load(dataset_path)
         trajs = data["trajs"]
@@ -486,11 +504,15 @@ with tabs[2]:
         base_model = CNF(dim=2, cond_dim=3, hidden_dim=int(hidden_dim), depth=int(mlp_depth), dropout_p=float(dropout_p)).to(device)
         load_checkpoint(base_model, optimizer=None, path=ckpt_path)
         vsde_ctx_dim_eval = int(st.session_state.get("vsde_ctx_dim", 128))
+        diff_learn_eval = bool(st.session_state.get("vsde_diff_learn", True))
+        init_log_diff_eval = float(st.session_state.get("vsde_initial_log_diff", -1.0))
         vsde_model = VariationalSDEModel(
             base_model,
             z_dim=2,
             ctx_dim=vsde_ctx_dim_eval,
             encoder_cfg={"x_dim": 2},
+            diffusion_learnable=diff_learn_eval,
+            initial_log_diff=init_log_diff_eval,
         ).to(device)
         load_checkpoint(vsde_model, optimizer=None, path=vsde_ckpt_path)
         vsde_model.eval()
@@ -512,17 +534,22 @@ with tabs[2]:
                 mask=mask_batch,
                 n_particles=int(vsde_eval_particles),
                 n_integration_steps=int(vsde_eval_steps),
+                anchor_noise=float(vsde_eval_anchor_noise),
             )
 
-        traj_mean = traj_samples.mean(dim=1).permute(1, 0, 2).cpu().numpy()
         traj_true = x_seq_batch.cpu().numpy()
-        n_demo = int(min(25, traj_mean.shape[0]))
+        traj_samples_np = traj_samples.permute(1, 2, 0, 3).contiguous().cpu().numpy()  # (P, B, T, D)
+        n_demo = int(min(10, traj_samples_np.shape[1]))
+        p_demo = int(min(traj_samples_np.shape[0], 3))
+        trajs_pred = traj_samples_np[:p_demo, :n_demo]  # (p_demo, n_demo, T, D)
+        trajs_pred = trajs_pred.reshape(p_demo * n_demo, trajs_pred.shape[2], trajs_pred.shape[3])
+        trajs_true = np.repeat(traj_true[:n_demo], p_demo, axis=0)
         anim_vsde = animate_trajectories(
-            trajs_true=traj_true[:n_demo],
-            trajs_pred=traj_mean[:n_demo],
+            trajs_true=trajs_true,
+            trajs_pred=trajs_pred,
             flow_fn=build_flow(flow),
             H=H,
-            n_show=n_demo,
+            n_show=trajs_pred.shape[0],
             interval=30,
             tail=60,
             init_mean=init_mean_loaded,
@@ -532,7 +559,9 @@ with tabs[2]:
         )
         components.html(animation_to_html(anim_vsde, embed_limit_mb=float(embed_limit_mb)), height=420)
         elbo_est = -float(loss_eval.item())
-        st.write(f"Variational ELBO ≈ {elbo_est:.4f} | log_px={stats_eval['log_px_mean']:.4f} | control={stats_eval['control_cost']:.4f} | KL={stats_eval['kl_z0']:.4f}")
+        st.write(
+            f"Variational ELBO ≈ {elbo_est:.4f} | log_px={stats_eval['log_px_mean']:.4f} | control={stats_eval['control_cost']:.4f} | KL={stats_eval['kl_z0']:.4f} | traj σ={stats_eval['z_traj_std']:.4f}"
+        )
         log(
             f"[vsde-eval] elbo={elbo_est:.4f} log_px={stats_eval['log_px_mean']:.4f} control={stats_eval['control_cost']:.4f} kl={stats_eval['kl_z0']:.4f}"
         )
