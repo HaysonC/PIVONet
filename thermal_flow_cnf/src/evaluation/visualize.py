@@ -24,16 +24,11 @@ def _plot_flow_overlay(ax, flow_fn, xlim, ylim, density: int = 20, mode: str = "
             V[i, j] = u[1] if len(u) > 1 else 0.0
     speed = np.sqrt(U**2 + V**2)
     if mode == "stream":
-        # Use streamplot colored by speed
-        strm = ax.streamplot(X, Y, U, V, color=speed, cmap='Greys', density=1.0, arrowsize=1.0, linewidth=1.0)
-        # add a light colorbar only if axes belong to a figure with space
-        try:
-            cb = plt.colorbar(strm.lines, ax=ax, fraction=0.046, pad=0.04)
-            cb.set_label('|u|')
-        except Exception:
-            pass
+        # Use streamplot colored by speed, but render in black tones
+        strm = ax.streamplot(X, Y, U, V, color='k', density=1.0, arrowsize=1.0, linewidth=0.8)
     else:
-        ax.quiver(X, Y, U, V, speed, cmap='Greys', alpha=0.8)
+        # black arrows for quiver
+        ax.quiver(X, Y, U, V, color='k', alpha=0.9)
 
 
 def _ellipse_from_gaussian(mean: np.ndarray, cov: np.ndarray, n_std: float = 2.0, **kwargs):
@@ -53,11 +48,13 @@ def _draw_varying_channel(ax, flow_fn, xlim, steps: int = 200, color: str = 'k',
     xs = np.linspace(xlim[0], xlim[1], steps)
     top = [Hx(x) for x in xs]
     bot = [-Hx(x) for x in xs]
-    ax.plot(xs, top, color=color, linestyle='--', linewidth=1.2, alpha=alpha)
-    ax.plot(xs, bot, color=color, linestyle='--', linewidth=1.2, alpha=alpha)
+    ax.plot(xs, top, color='k', linestyle='--', linewidth=1.2, alpha=alpha)
+    ax.plot(xs, bot, color='k', linestyle='--', linewidth=1.2, alpha=alpha)
 
 def plot_trajectories(trajs: np.ndarray, flow_fn=None, H: float | None = None, n_show: int = 50, init_mean: np.ndarray | None = None, init_cov: np.ndarray | None = None, flow_overlay_mode: str = "quiver"):
     fig, ax = plt.subplots(figsize=(6, 4))
+    fig.patch.set_facecolor('white')
+    ax.set_facecolor('white')
     N = min(n_show, trajs.shape[0])
     idx = np.linspace(0, trajs.shape[0] - 1, N).astype(int)
     xs = trajs[:, :, 0]
@@ -86,6 +83,9 @@ def plot_trajectories(trajs: np.ndarray, flow_fn=None, H: float | None = None, n
 
 def plot_density_hist2d(samples_true: np.ndarray, samples_pred: np.ndarray, bins: int = 60):
     fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+    fig.patch.set_facecolor('white')
+    for ax in axes:
+        ax.set_facecolor('white')
     axes[0].hist2d(samples_true[:, 0], samples_true[:, 1], bins=bins, cmap='viridis')
     axes[0].set_title('True final positions')
     axes[1].hist2d(samples_pred[:, 0], samples_pred[:, 1], bins=bins, cmap='viridis')
@@ -111,6 +111,8 @@ def animate_trajectories(
     frame_stride: int | None = None,
 ):
     fig, ax = plt.subplots(figsize=(6, 4))
+    fig.patch.set_facecolor('white')
+    ax.set_facecolor('white')
     n_true = trajs_true.shape[0]
     n_pred = trajs_pred.shape[0] if trajs_pred is not None else None
     if trajs_pred is not None:

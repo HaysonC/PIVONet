@@ -6,6 +6,9 @@ from typing import Optional, List
 import numpy as np
 import streamlit as st
 import streamlit.components.v1 as components
+import subprocess
+import sys
+from pathlib import Path
 import torch
 from torch.utils.data import DataLoader
 from thermal_flow_cnf.src.config import CONFIG
@@ -156,7 +159,7 @@ def build_flow(name: str):
     # default
     return poiseuille_flow(Umax, H)
 
-tabs = st.tabs(["Data", "Train", "Inference & Animate", "Metrics", "Logs"])
+tabs = st.tabs(["Data", "Train", "Inference & Animate", "3D Viewer", "Metrics", "Logs"])
 
 with tabs[0]:
     st.subheader("Data")
@@ -594,123 +597,75 @@ with tabs[2]:
             log(f"[animate][error] {type(e).__name__}: {e}")
             st.error(f"Animation failed: {e}")
 
-    if dataset_path and vsde_ckpt_path and ckpt_path and st.button("Sample Variational Posterior", key="sample_vsde_btn"):
-        device = selected_device
-        data = np.load(dataset_path)
-        init_mean_loaded = data.get("init_mean")
-        init_cov_loaded = data.get("init_cov")
-        ds_seq = TrajectorySequenceDataset(dataset_path)
-        dl_seq = DataLoader(ds_seq, batch_size=int(vsde_eval_batch), shuffle=False)
-        x_seq_batch, t_seq_batch, ctx_batch, mask_batch = next(iter(dl_seq))
-        x_seq_batch = x_seq_batch.to(device=device, dtype=torch.float32)
-        t_seq_batch = t_seq_batch.to(device=device, dtype=torch.float32)
-        ctx_batch = ctx_batch.to(device=device, dtype=torch.float32)
-        mask_batch = mask_batch.to(device=device, dtype=torch.float32)
+    # (External Taichi viewer button removed)
 
-        base_model = CNF(dim=2, cond_dim=3, hidden_dim=int(hidden_dim), depth=int(mlp_depth), dropout_p=float(dropout_p)).to(device)
-        load_checkpoint(base_model, optimizer=None, path=ckpt_path)
-        vsde_ctx_dim_eval = int(st.session_state.get("vsde_ctx_dim", 128))
-        diff_learn_eval = bool(st.session_state.get("vsde_diff_learn", True))
-        init_log_diff_eval = float(st.session_state.get("vsde_initial_log_diff", -1.0))
-        vsde_model = VariationalSDEModel(
-            base_model,
-            z_dim=2,
-            ctx_dim=vsde_ctx_dim_eval,
-            encoder_cfg={"x_dim": 2},
-            diffusion_learnable=diff_learn_eval,
-            initial_log_diff=init_log_diff_eval,
-        ).to(device)
-        load_checkpoint(vsde_model, optimizer=None, path=vsde_ckpt_path)
-        vsde_model.eval()
+    # (Removed tester buttons: Sample Variational Posterior and Showcase)
 
-        with torch.no_grad():
-            loss_eval, stats_eval = vsde_model.compute_elbo(
-                x_seq_batch,
-                t_seq_batch,
-                context=ctx_batch,
-                mask=mask_batch,
-                n_particles=int(vsde_eval_particles),
-                obs_std=float(vsde_eval_obs),
-                n_integration_steps=int(vsde_eval_steps),
-            )
-            _, traj_samples, _ = vsde_model.sample_posterior(
-                x_seq_batch,
-                t_seq_batch,
-                context=ctx_batch,
-                mask=mask_batch,
-                n_particles=int(vsde_eval_particles),
-                n_integration_steps=int(vsde_eval_steps),
-                anchor_noise=float(vsde_eval_anchor_noise),
-            )
+    with tabs[3]:
+        st.subheader("3D Viewer (inline)")
+        st.caption("Interactive 3D animation of particle trajectories (in-app, no external window).")
+        # Select source: choose dataset or use current CSV
+        ds_choice = st.selectbox("Source dataset (prefer data/<name>/ with positions_frame_*.bin)", options=["current_sim_csv"] + sorted([p.name for p in Path('data').iterdir() if p.is_dir()]), index=0)
+        max_points = st.number_input("Max particles to display", min_value=100, max_value=50000, value=2000, step=100)
+        frame_step = st.number_input("Frame stride", min_value=1, max_value=50, value=1, step=1)
+        if st.button("Load 3D Viewer", key="load_3d_viewer"):
+            import plotly.graph_objects as go
+            # load data
+            if ds_choice == 'current_sim_csv':
+                csv_path = Path('thermal_flow_cnf') / 'data' / 'current' / 'sim_data.csv'
+                if not csv_path.exists():
+                    st.error("No sim_data.csv found in thermal_flow_cnf/data/current/")
+                else:
+                    df = None
+                    import pandas as pd
+                    df = pd.read_csv(csv_path, comment='#')
+                    # pivot into (T, N, 3)
+                    pids = df['particle_id'].unique()
+                    tids = df['time_step'].unique()
+                    N = len(pids)
+                    T = len(tids)
+                    # sample particles if too many
+                    sel_pids = pids if N <= max_points else np.random.choice(pids, size=max_points, replace=False)
+                    frames = []
+                    for t in sorted(tids)[::frame_step]:
+                        sub = df[df['time_step'] == t]
+                        coords = sub.set_index('particle_id').loc[sel_pids][['x', 'y']].to_numpy()
+                        z = np.zeros((coords.shape[0], 1), dtype=np.float32)
+                        pts = np.concatenate([coords, z], axis=1)
+                        frames.append(pts)
+            else:
+                data_dir = Path('data') / ds_choice
+                if not data_dir.exists():
+                    st.error(f"Dataset folder data/{ds_choice} not found")
+                    frames = []
+                else:
+                    files = sorted(data_dir.glob('positions_frame_*.bin'))
+                    frames = []
+                    for i, f in enumerate(files[::frame_step]):
+                        arr = np.fromfile(str(f), dtype=np.float32).reshape(-1, 3)
+                        if arr.shape[0] > max_points:
+                            idx = np.linspace(0, arr.shape[0] - 1, max_points).astype(int)
+                            arr = arr[idx]
+                        frames.append(arr)
 
-        traj_true = x_seq_batch.cpu().numpy()
-        traj_samples_np = traj_samples.permute(1, 2, 0, 3).contiguous().cpu().numpy()  # (P, B, T, D)
-        n_demo = int(min(10, traj_samples_np.shape[1]))
-        p_demo = int(min(traj_samples_np.shape[0], 3))
-        trajs_pred = traj_samples_np[:p_demo, :n_demo]  # (p_demo, n_demo, T, D)
-        trajs_pred = trajs_pred.reshape(p_demo * n_demo, trajs_pred.shape[2], trajs_pred.shape[3])
-        trajs_true = np.repeat(traj_true[:n_demo], p_demo, axis=0)
-        anim_vsde = animate_trajectories(
-            trajs_true=trajs_true,
-            trajs_pred=trajs_pred,
-            flow_fn=build_flow(flow),
-            H=H,
-            n_show=trajs_pred.shape[0],
-            interval=30,
-            tail=60,
-            init_mean=init_mean_loaded,
-            init_cov=init_cov_loaded,
-            max_frames=int(max_frames),
-            frame_stride=None,
-        )
-        components.html(animation_to_html(anim_vsde, embed_limit_mb=float(embed_limit_mb)), height=420)
-        elbo_est = -float(loss_eval.item())
-        st.write(
-            f"Variational ELBO ≈ {elbo_est:.4f} | log_px={stats_eval['log_px_mean']:.4f} | control={stats_eval['control_cost']:.4f} | KL={stats_eval['kl_z0']:.4f} | traj σ={stats_eval['z_traj_std']:.4f}"
-        )
-        log(
-            f"[vsde-eval] elbo={elbo_est:.4f} log_px={stats_eval['log_px_mean']:.4f} control={stats_eval['control_cost']:.4f} kl={stats_eval['kl_z0']:.4f}"
-        )
-    elif dataset_path and vsde_ckpt_path and not ckpt_path:
-        st.warning("Select a CNF checkpoint to pair with the variational posterior sampler.")
+            if len(frames) == 0:
+                st.error("No frames loaded for 3D viewer.")
+            else:
+                # build Plotly animation
+                fig = go.Figure(
+                    data=[go.Scatter3d(x=frames[0][:,0], y=frames[0][:,1], z=frames[0][:,2], mode='markers', marker=dict(size=2, color='blue'))],
+                    layout=go.Layout(
+                        scene=dict(xaxis=dict(title='x'), yaxis=dict(title='y'), zaxis=dict(title='z')),
+                        updatemenus=[dict(type='buttons', showactive=False, y=1, x=1.1, xanchor='right', yanchor='top',
+                                          buttons=[dict(label='Play', method='animate', args=[None, dict(frame=dict(duration=50, redraw=True), fromcurrent=True, transition=dict(duration=0))]),
+                                                   dict(label='Pause', method='animate', args=[[None], dict(frame=dict(duration=0, redraw=False), mode='immediate', transition=dict(duration=0))])])]
+                    ),
+                    frames=[go.Frame(data=[go.Scatter3d(x=fr[:,0], y=fr[:,1], z=fr[:,2], mode='markers', marker=dict(size=2, color='blue'))]) for fr in frames]
+                )
+                fig.update_layout(height=640)
+                st.plotly_chart(fig, use_container_width=True)
 
-        st.markdown("### Particle Position Showcase")
-        st.caption("Animate individual particles starting near center, mid-channel, and near boundary for qualitative flow inspection.")
-        showcase_btn = st.button("Showcase Center/Mid/Boundary", key="showcase_btn")
-        if dataset_path and showcase_btn:
-            data = np.load(dataset_path)
-            trajs = data["trajs"]
-            x0s = data["x0s"].astype(np.float32)
-            thetas = np.zeros((x0s.shape[0], 1), dtype=np.float32)
-            context = torch.from_numpy(np.concatenate([x0s, thetas], axis=1)).to(torch.float32)
-            device = selected_device
-            context = context.to(device)
-            model = CNF(dim=2, cond_dim=3, hidden_dim=int(hidden_dim), depth=int(mlp_depth), dropout_p=float(dropout_p)).to(device)
-            if ckpt_path and os.path.isfile(ckpt_path):
-                try:
-                    load_checkpoint(model, optimizer=None, path=ckpt_path)
-                    log(f"[showcase] loaded checkpoint: {os.path.basename(ckpt_path)}")
-                except Exception as e:
-                    st.warning(f"Checkpoint incompatible or unreadable, running without loading: {e}")
-                    log(f"[showcase][ckpt-warning] {e}")
-            model.eval()
-            with torch.no_grad():
-                # Pick representative starting points
-                center = torch.tensor([[0.0, 0.0]], device=device, dtype=torch.float32)
-                mid = torch.tensor([[0.2, 0.5 * float(H) * 0.5]], device=device, dtype=torch.float32)  # quarter height
-                boundary = torch.tensor([[0.4, 0.9 * float(H)]], device=device, dtype=torch.float32)
-                reps = torch.cat([center, mid, boundary], dim=0)
-                ctx_rep = torch.zeros(reps.size(0), 3, device=device, dtype=torch.float32)
-                trajs_rep = model.rollout_from(reps, ctx_rep, steps=int(min(infer_steps, 300)), H=float(H), enforce_bounds=True).cpu().numpy()
-            # Build a bespoke pretty animation using existing helper
-            anim_rep = animate_trajectories(
-                trajs_true=trajs_rep, trajs_pred=None, flow_fn=build_flow(flow), H=H, n_show=3,
-                interval=35, tail=80, max_frames=int(max_frames), frame_stride=None,
-            )
-            components.html(animation_to_html(anim_rep, embed_limit_mb=float(embed_limit_mb)), height=420)
-            st.toast("Showcase animation ready", icon="🎯")
-
-with tabs[3]:
+with tabs[4]:
     st.subheader("Metrics & Analysis")
     dataset_path = st.session_state.get("dataset_path")
     ckpt_path = st.session_state.get("model_ckpt")
@@ -742,7 +697,7 @@ with tabs[3]:
     else:
         st.info("Select a dataset on the Data tab.")
 
-with tabs[4]:
+with tabs[5]:
     st.subheader("Logs")
     c1, c2 = st.columns([1, 5])
     with c1:
