@@ -6,3 +6,4 @@ scipy
 tqdm
 pandas
 streamlit
+plotly

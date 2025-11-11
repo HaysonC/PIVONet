@@ -130,8 +130,6 @@ def train_variational_sde(
     progress_cb: Optional[Callable[..., None]] = None,
     n_particles: int = 4,
     obs_std: float = 0.05,
-    obs_std_start: float | None = None,
-    obs_std_final: float | None = None,
     kl_warmup: float = 1.0,
     control_cost_scale: float = 1.0,
     n_integration_steps: int = 50,
@@ -144,11 +142,6 @@ def train_variational_sde(
         model.train()
         running = 0.0
         total = len(dataloader)
-        current_obs_std = float(obs_std)
-        if obs_std_start is not None and obs_std_final is not None and epochs > 1:
-            alpha = (epoch - 1) / max(1, epochs - 1)
-            current_obs_std = float(obs_std_start + (obs_std_final - obs_std_start) * alpha)
-
         for step, batch in enumerate(dataloader, start=1):
             x_seq, t_seq, context, mask = batch
             x_seq = x_seq.to(device=device, dtype=torch.float32)
@@ -163,7 +156,7 @@ def train_variational_sde(
                 context=context,
                 mask=mask_tensor,
                 n_particles=n_particles,
-                obs_std=current_obs_std,
+                obs_std=obs_std,
                 kl_warmup=kl_warmup,
                 control_cost_scale=control_cost_scale,
                 n_integration_steps=n_integration_steps,
@@ -175,8 +168,6 @@ def train_variational_sde(
             running += float(loss.item())
             if progress_cb is not None:
                 try:
-                    stats = dict(stats)
-                    stats["obs_std"] = current_obs_std
                     progress_cb(epoch, epochs, step, total, float(loss.item()), stats)
                 except TypeError:
                     progress_cb(epoch, epochs, step, total, float(loss.item()))

@@ -139,7 +139,6 @@ class VariationalSDEModel(nn.Module):
         init_hidden: int = 128,
         drift_hidden: int = 128,
         diffusion_learnable: bool = False,
-        initial_log_diff: float = -1.0,
     ):
         super().__init__()
         enc_cfg = encoder_cfg or {}
@@ -148,9 +147,9 @@ class VariationalSDEModel(nn.Module):
         self.post_drift = PosteriorDriftNet(z_dim, ctx_dim, time_emb_dim=enc_cfg.get("time_emb_dim", 32), hidden=drift_hidden, out_diff=False)
         # if diffusion learnable, a positive scalar per-dim or global
         if diffusion_learnable:
-            self.log_diff_param = nn.Parameter(torch.tensor(float(initial_log_diff)))
+            self.log_diff_param = nn.Parameter(torch.tensor(-3.0))
         else:
-            self.register_buffer("log_diff_param", torch.tensor(float(initial_log_diff)))
+            self.register_buffer("log_diff_param", torch.tensor(-3.0))
         self.cnf = cnf
         self.z_dim = int(z_dim)
         self.cond_dim = getattr(cnf, "cond_dim", None)
