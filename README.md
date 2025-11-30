@@ -1,165 +1,61 @@
-# Thermal Flow CNF
+# PIVONet (Flow)
 
-![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
-![PyTorch](https://img.shields.io/badge/PyTorch-2.x-ee4c2c)
-![torchdiffeq](https://img.shields.io/badge/torchdiffeq-latest-4b8bbe)
-![Streamlit](https://img.shields.io/badge/Streamlit-app-ff4b4b)
-![Apple%20Silicon%20MPS](https://img.shields.io/badge/Apple%20Silicon-MPS%20supported-lightgrey)
-![License: MIT](https://img.shields.io/badge/License-MIT-green)
+Physics-Informed Variational ODE Networks (PIVONet) fuses PyFR-based CFD data ingestion with hybrid diffusion/CNF modeling and dual interfaces (conversational CLI + Streamlit GUI).
 
-Model, simulate, and analyze thermal particle transport in simple channel flows using a Continuous Normalizing Flow (CNF). This project provides:
+## Installation
 
-- A simulator for overdamped Langevin dynamics with reflecting boundaries and configurable flow profiles (uniform, Couette, Poiseuille)
-- A CNF model (Neural ODE) trained to model final particle positions conditioned on initial state/context
-- A Streamlit app with an end-to-end workflow: simulate → train → animate → analyze metrics
-- Apple Silicon (MPS) support and robust animation embedding controls
-
-
-## Features
-
-- Simulation
-  - Overdamped Langevin trajectories with reflecting y-boundaries at ±H
-  - Built-in flows: uniform, Couette, and Poiseuille
-  - Initial distribution options:
-    - Uniform: x∈[0,1], y∈[−H, H]
-    - Gaussian: user-specified mean and covariance (saved as metadata with the dataset)
-- CNF Model
-  - Neural ODE with torchdiffeq on CUDA/CPU; on Apple MPS a fixed-step RK4 fallback keeps everything float32-safe
-  - Log-likelihood training with AdamW, cosine LR schedule, grad clipping
-  - Checkpoints include shape metadata (class/dim/cond_dim/hidden_dim) for compatibility
-- Visualization and UI
-  - Streamlit app with tabs: Data, Train, Inference & Animate, Metrics & Analysis, Logs
-  - Flow quiver overlay, trajectories, and animation with an initial Gaussian ellipse and mean marker
-  - Animation size controls: max frames, stride (downsampling), and embed size limit (MB)
-  - Checkpoint selection is optional; the app will run with a fresh model if none or incompatible
-  - Live progress, logs, and toasts for long-running steps
-
-
-## Project layout
-
-```text
-. 
-├── run_app.sh                         # Launches the Streamlit app
-├── requirements.txt                   # Python dependencies
-├── thermal_flow_cnf/
-│   ├── app_streamlit.py              # Streamlit UI (simulate/train/animate/metrics/logs)
-│   ├── main.py                       # CLI entry points (simulate/train/evaluate)
-│   └── src/
-│       ├── config.py
-│       ├── flows/                    # Uniform, Couette, Poiseuille
-│       ├── simulation/
-│       │   ├── langevin.py           # Simulate trajectories + dataset generation
-│       │   └── dataset.py            # PyTorch Dataset wrapper
-│       ├── model/
-│       │   ├── net.py                # MLP backbone
-│       │   ├── base_cnf.py           # ODEFunc + CNF, MPS-safe integration
-│       │   └── train.py              # Training loop with progress callback
-│       ├── evaluation/
-│       │   ├── visualize.py          # Plots + animations (with size controls)
-│       │   └── metrics.py            # MSD, KL, overlap
-│       └── utils/
-│           └── io.py                 # Checkpoint save/load with metadata
-└── notebooks/                        # Optional exploratory notebooks
-```
-
-
-## Quickstart
-
-### 1) Environment
-
-You’ll need Python 3.10+ (3.11 recommended). Create a virtual environment and install dependencies:
+Use any modern Python (>= 3.10). The project ships with a `pyproject.toml`, so you can install it directly:
 
 ```bash
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+python -m pip install .
 ```
 
-If you’re on Apple Silicon and want to use MPS, use a recent PyTorch build that supports MPS. The app also supports CPU and CUDA.
-
-### 2) Run the Streamlit app
-
-Use the provided script (it sets PYTHONPATH for local imports):
+For development, install in editable mode so local changes are reflected immediately:
 
 ```bash
-source run_app.sh
+python -m pip install -e .
 ```
 
-This launches a browser at a local URL. The app is organized into tabs:
+Both commands respect `requirements.txt`, so you get the same dependency set used in the repo.
 
-- Data: Simulate datasets
-  - Choose flow (uniform/Couette/Poiseuille), simulation parameters (N, T, dt, D, H)
-  - Choose the initial distribution (uniform or Gaussian) and, if Gaussian, specify mean and covariance
-  - Simulate and select a dataset for plotting; MSD and a static trajectory plot are shown
-- Train: Train the CNF
-  - Choose device (cuda/mps/cpu), hidden size, epochs, and batch size
-  - Training progress shows NLL, avg logp, and bits-per-dim (bpd)
-  - Checkpoints are optional; newest is auto-selected but you can choose the "no checkpoint" option to run with a fresh model
-- Inference & Animate: Animate true vs model trajectories
-  - Uses the selected dataset and (optionally) a checkpoint
-  - Initial Gaussian ellipse and mean marker are overlaid for context
-  - Animation controls:
-    - Max frames: caps total frames to keep embedded HTML small
-    - Frame stride (0 = auto): downsample frames manually if needed
-    - Embed limit (MB): allow larger-than-default animations if desired
-- Metrics & Analysis: Quick inspection
-  - 2D histograms for final positions and simple metrics (KL divergence, overlap ratio)
-- Logs: Centralized logs with a clear button
+## Usage
 
-### 3) Device selection
+### Conversational CLI (`pivo`)
 
-In the sidebar, the app detects available devices: cuda, mps, cpu. Pick the one you want. The code keeps tensors float32-safe on MPS and uses a pure PyTorch RK4 integrator on MPS to avoid float64 issues in adjoint solvers.
-
-
-## Command-line interface (optional)
-
-You can also simulate/train/evaluate from the CLI. Ensure PYTHONPATH includes the project root (the app script already does this):
+After installation a console script named `pivo` becomes available. It launches the conversational Rich/Questionary CLI:
 
 ```bash
-export PYTHONPATH=.
-# Simulate
-python thermal_flow_cnf/main.py simulate --flow poiseuille --num 1000
-
-# Train
-python thermal_flow_cnf/main.py train --dataset thermal_flow_cnf/data/raw/<your_dataset>.npz --epochs 20 --batch 256
-
-# Evaluate (MSD)
-python thermal_flow_cnf/main.py evaluate --dataset thermal_flow_cnf/data/raw/<your_dataset>.npz --metric msd
+pivo
 ```
 
-Generated artifacts:
+The CLI lets you import velocity snapshots, visualize saved bundles, sketch velocity fields, or train the hybrid diffusion+CNF model. When a prompt asks for a previously produced trajectory or velocity file, you can leave it blank to reuse the last successful path.
 
-- Datasets: `thermal_flow_cnf/data/raw/*.npz` (contains trajs, x0s, thetas, dt, D, H, plus init_mean/init_cov)
-- Checkpoints: `thermal_flow_cnf/checkpoints/*.pt` (with metadata for compatibility)
+#### YAML Experiment Pipelines
 
+Select **experiment** from the CLI menu (or run `pivo --list-experiments` / `pivo --run-experiment <slug>`) to inspect YAML pipelines stored under `src/experiments/`. Each YAML file defines metadata plus a list of steps that invoke helper scripts. When you choose a pipeline, the orchestrator detects your compute device, prints `[m/n]` progress labels, and shows a Rich loading bar while each script runs. Try the included `demo-baseline` pipeline for a quick sanity check (`pivo --run-experiment demo-baseline`).
 
-## Troubleshooting
+### Launcher / GUI
 
-- Apple Silicon (MPS) float64 error
-  - The app forces float32 on MPS for all ODE states and time grids
-  - On MPS it uses a fixed-step RK4 integrator instead of the adjoint method to avoid dtype pitfalls
-  - You can always switch to CPU in the sidebar if you prefer
+If you prefer the original launcher that lets you choose between CLI and Streamlit GUI, run:
 
-- Animation too large for embedding (20 MB limit)
-  - Use “Max frames” and “Frame stride” to downsample frames
-  - Increase “Embed limit (MB)” if you really want a larger inline animation (may impact page responsiveness)
+```bash
+python -m src.main
+```
 
-- Checkpoint incompatibility
-  - Checkpoints are validated against model metadata; if incompatible, the app warns and runs with a fresh model
-  - You can select the "no checkpoint" option to skip loading any checkpoint
+Or go straight to the GUI once dependencies are installed:
 
-- Model loss becomes negative
-  - The optimization target is NLL = −log p(x|context). As the model improves, log-likelihood increases and NLL can become negative—this is normal for densities
-  - The UI displays NLL, avg logp, and bpd to make interpretation clear
+```bash
+streamlit run src/app/ui.py
+```
 
+## Project Layout
 
-## Notes
-
-- This project is educational/research-oriented, focusing on clarity and a smooth UI for experimentation
-- If you enable very long trajectories or large particle counts, prefer downsampling animations and running training on CUDA
-
+- `src/` – Core Python package (CLI, CFD utilities, hybrid models, visualization helpers).
+- `docs/flow_usage.md` – Detailed walkthrough of both interfaces and automation tips.
+- `src/experiments/` – YAML experiment definitions and helper scripts.
+- `config.yml` – Simulation defaults shared by CLI/GUI.
+- `requirements.txt` – Exact dependency pins reused by the packaging metadata.
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](./LICENSE) for details.
- 
+Released under the MIT License (see `LICENSE`).

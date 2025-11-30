@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pivonet"
+version = "1.0.0"
+description = "Physics-Informed Variational ODE toolkit for CFD pipelines"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [
+  { name = "Hei Shing Cheung" },
+  { name = "David Lin" },
+  { name = "Ethan Long" }
+]
+keywords = ["cfd", "ode", "pde", "streamlit", "cli", "torch"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent"
+]
+dynamic = ["dependencies"]
+
+[project.scripts]
+pivo = "src.main:main"
+
+[project.urls]
+Homepage = "https://github.com/HaysonC/ODE_CNF_thermal_motion"
+Repository = "https://github.com/HaysonC/ODE_CNF_thermal_motion"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }

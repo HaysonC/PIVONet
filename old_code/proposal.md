@@ -1,0 +1,186 @@
+# Toward Modeling Thermal Flow with Normalizing Flow
+
+**Authors:**
+Hayson Cheung (1010907823)
+Ethan Long (1010941509)
+David Lin (1010900759)
+
+---
+
+## Abstract
+
+We propose a hybrid method for predicting particle trajectories in fluid flows by combining simplified simulations with machine learning. Stochastic particle paths train a model that generalizes to new conditions, offering fast, accurate predictions without full-scale simulations. This approach is effective for applications from microfluidics to environmental modeling.
+
+---
+
+## I. Background
+
+### A. Motive
+
+The motion of particles in fluids is governed by complex interactions between the underlying flow field and stochastic perturbations arising from thermal effects or turbulence [1]. Traditional computational fluid dynamics (CFD) methods provide high-fidelity simulations but are often prohibitively expensive for real-time prediction or large-scale parameter studies.
+
+---
+
+### B. Goal
+
+The aim of this project is to develop a modeling framework that integrates stochastic particle simulations based on the **overdamped Langevin equation** with **continuous normalizing flows (CNFs)** to efficiently predict particle trajectories in two-dimensional fluid flows.
+
+**Specific Objectives:**
+
+1. Generate trajectory data from simplified analytic flow profiles augmented with Brownian motion.
+2. Employ CNFs to learn the underlying trajectory distribution conditioned on flow parameters and initial positions.
+
+This approach enables accurate prediction of individual particle paths from initial conditions and flow characteristics, thereby bridging physical modeling and data-driven inference.
+
+---
+
+### C. Computational Fluid Dynamics
+
+We model particle trajectories using the **overdamped Langevin equation**, which captures advection–diffusion physics while remaining computationally tractable [2].
+
+[
+d\\mathbf{x}\_t = u(\\mathbf{x}\_t)dt + \\sqrt{2D},d\\mathbf{W}\_t
+]
+
+where (u(\\mathbf{x}\_t)) is the local fluid velocity field, (D) is the diffusion coefficient, and (\\mathbf{W}\_t) is a two-dimensional Brownian motion (neglecting inertia).
+
+We consider three canonical flow profiles:
+
+* **Uniform flow:** (u = (U\_0, 0))
+* **Couette shear:** (u = (\\gamma y, 0))
+* **Poiseuille flow:** (u = (U\_{\\text{max}}[1 - (y/H)^2], 0))
+
+The stochastic differential equation (SDE) decomposes motion into deterministic advection and stochastic diffusion.
+Discretized via **Euler–Maruyama**:
+
+[
+\\mathbf{x}\_{t+\\Delta t} = \\mathbf{x}\_t + u(\\mathbf{x}\_t)\\Delta t + \\sqrt{2D\\Delta t},\\boldsymbol{\\xi}, \\quad \\boldsymbol{\\xi} \\sim \\mathcal{N}(0, I)
+]
+
+Reflecting boundaries are applied at (y = \\pm H).
+This system is mathematically analogous to linear ODEs of the form:
+
+[
+x'(t) = k A x(t)
+]
+
+whose eigenvalue structure governs equilibrium behavior [4].
+
+The stochastic nature of this process leads to variability in trajectories even with identical initial conditions, consistent with classical dispersion theory [5].
+For each trajectory, we record initial conditions (\\mathbf{x}\_0), flow parameters (\\boldsymbol{\\theta}), and the sequence ({\\mathbf{x}*t}*{t=0}^T).
+
+---
+
+### D. Normalizing Flow
+
+For trajectory modeling, **Continuous Normalizing Flows (CNFs)** treat the transformation as an ODE [6, 7]:
+
+[
+\\frac{d z(t)}{dt} = g\_\\phi(z(t), t), \\quad z(0) = z\_0, , z(1) = x
+]
+
+The log-density evolves according to:
+
+[
+\\frac{d\\log p(z(t))}{dt} = -\\text{tr}\\left( \\frac{\\partial g\_\\phi}{\\partial z} \\right)
+]
+
+This tracks how probability mass compresses or expands as particles flow through the learned transformation.
+The trace term measures the divergence of the learned velocity field (g\_\\phi):
+
+* Positive divergence → expansion → density decreases
+* Negative divergence → compression → density increases
+
+In our context, this allows the model to learn **where trajectories concentrate** (e.g., along streamlines) versus **where they disperse** (due to diffusion).
+
+---
+
+### E. Bi-directionality and Training
+
+CNFs are **diffeomorphic**, i.e., reversible mappings between latent and observed distributions.
+Thus, we can integrate the ODE both **forward** (sampling) and **backward** (likelihood computation).
+
+* **Forward:** (z\_0 \\sim \\mathcal{N}(0, I) \\rightarrow x = f\_\\phi(z\_0; x\_0, \\theta))
+* **Backward:** (x \\rightarrow z\_0) to compute exact likelihoods for training.
+
+The training objective maximizes the conditional log-likelihood:
+
+[
+\\mathcal{L}(\\phi) = \\mathbb{E}*{x \\sim p*{\\text{data}}} [\\log p\_\\phi(x | x\_0, \\theta)]
+]
+
+Inference proceeds by sampling (z \\sim \\mathcal{N}(0, I)) and applying the learned transformation (f\_\\phi).
+
+This enables **probabilistic trajectory forecasting**, capturing both deterministic flow-driven behavior and stochastic variability.
+
+---
+
+## II. Scope and Feasibility
+
+The project aims to develop a **machine learning framework** for predicting particle trajectories by training a **CNF model** on data generated by a stochastic Langevin simulator.
+
+To ensure feasibility:
+
+* We do **not** solve the full Navier–Stokes equations.
+* Instead, we generate synthetic data from simplified analytic flow fields with Brownian perturbations.
+
+---
+
+### A. Milestone 1 — Dataset Development *(Week 1)*
+
+**Effort:** 12–15 hours
+
+* Implement particle–flow simulator with reflecting boundaries.
+* Generate trajectory datasets quickly.
+* Validate via drift, variance, and mean-squared displacement (MSD) against theory.
+
+---
+
+### B. Milestone 2 — ODE Formulation & Model Training *(Weeks 3–5)*
+
+**Effort:** 30–35 hours
+
+* Derive and implement the CNF ODE in code.
+* Build PyTorch model, implement ODE solver, and train the network.
+* Ensure numerical stability and tune hyperparameters.
+
+---
+
+### C. Milestone 3 — Visualization & Report *(Weeks 6–7)*
+
+**Effort:** 20–25 hours
+
+* Evaluate trained model against ground truth using:
+  * Trajectory overlap
+  * MSD
+  * KL divergence
+* Visualize trajectories, density evolution, and learned distributions.
+* Compile final report with results and analysis.
+
+---
+
+### D. Scoping
+
+This three-milestone structure ensures:
+
+* Early dataset completion
+* Midterm model training
+* Final evaluation and reporting
+
+Feasibility and quality are maintained through incremental development.
+
+---
+
+## References
+
+1. T. M. Squires & S. R. Quake, *Microfluidics: Fluid Physics at the Nanoliter Scale*, **Rev. Mod. Phys.**, 77, 977–1026 (2005).
+2. D. L. Ermak & J. A. McCammon, *Brownian Dynamics with Hydrodynamic Interactions*, **J. Chem. Phys.**, 69, 1352–1360 (1978).
+3. G. K. Batchelor, *An Introduction to Fluid Dynamics*, Cambridge Univ. Press (1967).
+4. R. L. Devaney & S. G. Krantz, *Differential Equations: An Introduction to Modern Methods*, Brooks/Cole (2007).
+5. G. I. Taylor, *Dispersion of Soluble Matter in Flowing Solvent*, **Proc. Roy. Soc. A**, 219, 186–203 (1953).
+6. R. T. Q. Chen et al., *Neural Ordinary Differential Equations*, **NeurIPS**, 2018.
+7. W. Grathwohl et al., *FFJORD: Free-form Continuous Dynamics for Scalable Reversible Generative Models*, **ICML**, 2019.
+8. L. Dinh et al., *NICE: Non-linear Independent Components Estimation*, **ICLR**, 2014.
+9. L. Dinh et al., *RealNVP: Density Estimation Using Real-valued Non-Volume Preserving Transformations*, **ICLR**, 2017.
+10. D. P. Kingma & P. Dhariwal, *Glow: Generative Flow with Invertible 1×1 Convolutions*, **NeurIPS**, 2018.
+11. D. J. Rezende & S. Mohamed, *Variational Inference with Normalizing Flows*, **ICML**, 2015.

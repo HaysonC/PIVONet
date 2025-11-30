@@ -1,0 +1,87 @@
+Existing code is in src/.
+
+
+main is the entry point. CLI or GUI (cli/ or app/) is not needed for now.
+
+
+CFD Package (cfd/) which should be kinda completed by now
+
+
+Implement a cfd/ package for computational fluid dynamics.
+
+
+This package should:
+
+
+Handle mesh creation and fluidic simulation (via PyFR).
+
+
+Export particle trajectory data.
+
+
+Provide clear, modular, and hierarchical interfaces for CFD results.
+
+
+
+
+Any default parameters should be loaded from config.yml via utils.py.
+
+
+Utilities (utils/) should also handle cache and data management:
+
+
+Root contains a data and cache file.
+
+
+Each run should create a new cache subdirectory and manage cache there.
+
+
+Include any helper functions needed by cfd/ in utils/.
+
+
+
+
+Modeling & Hybrid Approach:
+
+
+Implement features from the old code, primarily as references for innovation.
+
+
+Particle trajectory modeling uses a hybrid approach:
+
+
+Train a variational encoder at each point to model diffusion behavior.
+
+
+Train a CNF (Continuous Normalizing Flow) model to model normal → end distributions and trajectories.
+
+
+
+
+Model results should have modular interfaces integrated with CFD results.
+
+
+Visualization & Animation:
+
+
+Implement robust visualization and animation functionality.
+
+
+Should be able to compare two sets of results effectively.
+
+
+Guidelines for Implementation:
+
+
+Ensure all components are modular, hierarchical, and interface-driven.
+
+
+CFD, particle trajectories, and model outputs must follow consistent interface conventions.
+
+
+Focus on clean architecture; separation of concerns is essential.
+
+
+
+If you want, I can also convert this into a concise instruction set your agent can use step-by-step, so it knows exactly what to implement first, second, etc., without ambiguity.
+Do you want me to do that?

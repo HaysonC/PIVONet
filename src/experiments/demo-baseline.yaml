@@ -1,0 +1,17 @@
+slug: demo-baseline
+name: Demo Baseline
+description: Generate a synthetic trajectory bundle and summarize it as a quick orchestration sanity check.
+steps:
+  - name: prepare-demo-artifacts
+    description: Create a lightweight trajectory bundle with random walks.
+    script: src/workflows/prepare_demo_artifacts.py
+    params:
+      output: data/demo/demo_orchestrator_bundle.npz
+      particles: 64
+      steps: 40
+      dt: 0.05
+  - name: summarize-demo-artifacts
+    description: Print key statistics for the generated bundle.
+    script: src/workflows/summarize_demo_artifacts.py
+    params:
+      input: data/demo/demo_orchestrator_bundle.npz

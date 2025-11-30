@@ -7,7 +7,6 @@ data/
 
 # jypyter notebook
 .ipynb_checkpoints
-*.ipynb
 *.pyc
 *.pyo
 *.pyd
@@ -19,3 +18,27 @@ __pycache__/
 dist/   
 
 checkpoints/
+cache/
+# exclude cache/empty file
+!cache/empty.txt
+
+# PyFR mesh and solution files
+*.pyfrs
+*.pyfrm
+
+# VTU files
+*.vtu
+
+# CSV files
+*.csv
+
+# Mac OS X junk
+.DS_Store
+
+# Backup files
+*~
+
+# Hidden files
+.*
+
+*.mp4
