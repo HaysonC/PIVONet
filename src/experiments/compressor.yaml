@@ -1,0 +1,90 @@
+slug: axial-compressor
+name: 2D Axial Compressor CFD Neural Stack
+description: >
+  Train the CNF backbone and variational SDE controller directly on CFD trajectory
+  bundles from the 2D axial compressor simulation.
+
+usage:
+  - "From the repo root, run `pivo --run-experiment axial-compressor` to execute the full experiment."
+  - "Alternatively, run pivo and then you can see a list of available experiments to run."
+
+steps:
+  - name: cnf-training
+    description: Fit the continuous normalizing flow on axial-compressor bundle endpoints to learn the base dynamics.
+    script: src/workflows/train_cnf.py
+    params:
+      bundles:
+        - data/axial-compressor/trajectories
+      batch_size: 512
+      epochs: 8
+      lr: 0.001
+      hidden_dim: 64
+      depth: 3
+      context_dim: 3
+      ckpt_dir: cache/checkpoints/axial-compressor_cnf
+      device: auto
+      limit: 512
+
+  - name: vsde-training
+    description: Optimize the variational SDE control module using the freshly trained axial-compressor CNF backbone.
+    script: src/workflows/train_variational_sde.py
+    params:
+      bundles:
+        - data/axial-compressor/trajectories
+      batch_size: 128
+      epochs: 4
+      lr: 0.005
+      n_particles: 4
+      n_integration_steps: 60
+      obs_std: 0.05
+      kl_warmup: 1.0
+      control_cost_scale: 1.0
+      ckpt_dir: cache/checkpoints/axial-compressor_vsde
+      device: auto
+      cnf_checkpoint: cache/checkpoints/axial-compressor_cnf/cnf_latest.pt
+      cnf_hidden_dim: 64
+      cnf_depth: 3
+      context_dim: 3
+      z_dim: 2
+      ctx_dim: 128
+      limit: 256
+      diffusion_learnable: true
+
+  - name: vsde-inference
+    description: >-
+      Run the trained VSDE controller on the axial-compressor flow to synthesize trajectories.
+      This step emits three overlay PNGs under `plots/`: `trajectory_overlay.png` (GT + VSDE + CNF),
+      `trajectory_overlay_vsde.png` (GT + VSDE only), and `trajectory_overlay_cnf.png` (GT + CNF only).
+      Use `overlay_dir` to redirect where these PNGs are stored (relative paths are resolved under `output_dir`).
+    script: src/workflows/run_vsde_inference.py
+    params:
+      bundles:
+        - data/axial-compressor/trajectories
+      batch_size: 64
+      workers: 0
+      limit: 256
+      device: auto
+      cnf_checkpoint: cache/checkpoints/axial-compressor_cnf/cnf_latest.pt
+      vsde_checkpoint: cache/checkpoints/axial-compressor_vsde/vsde_latest.pt
+      cnf_hidden_dim: 64
+      cnf_depth: 3
+      context_dim: 3
+      z_dim: 2
+      ctx_dim: 128
+      diffusion_learnable: true
+      n_particles: 32
+      n_integration_steps: 60
+      viz_trajectories: 48
+      overlay_max_paths: 35
+      output_dir: cache/artifacts/axial-compressor/vsde_inference
+      overlay_dir: overlays
+
+  - name: velocity-visualization
+    description: Sample a raw axial-compressor CFD velocity snapshot and render a flowing phase-space plot for QA.
+    script: src/workflows/render_velocity_field.py
+    params:
+      input: data/axial-compressor/velocity
+      output: cache/artifacts/axial-compressor/velocity_phase.png
+      samples: 50000
+      cmap: plasma
+      title: "Axial-compressor CFD velocity phase space"

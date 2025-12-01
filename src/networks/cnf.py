@@ -73,6 +73,30 @@ class CNFModel(nn.Module):
         logp0 = torch.zeros(x.size(0), 1, device=x.device, dtype=x.dtype)
         self.func.set_context(context)
         tspan = tspan.to(device=x.device, dtype=x.dtype)
+        # Validate the requested time span to avoid zero-range / underflow errors
+        if tspan.numel() < 2:
+            raise ValueError("tspan must contain at least two time points for integration")
+
+        t0_val = float(tspan[0].to("cpu"))
+        t1_val = float(tspan[-1].to("cpu"))
+        if abs(t1_val - t0_val) == 0.0:
+            # Nothing to integrate; return initial states unchanged
+            return x, logp0
+
+        # Ensure consecutive time differences are non-zero to avoid the
+        # ODE solver asserting on an underflow in dt (e.g. "underflow in dt 0.0").
+        # This can happen when callers construct a tspan with duplicate time
+        # entries or with steps=1. Provide a helpful error message so the
+        # orchestrating workflow can be adjusted.
+        diffs = torch.abs(tspan[1:] - tspan[:-1])
+        if torch.any(diffs <= torch.finfo(tspan.dtype).tiny):
+            raise ValueError(
+                "Invalid tspan: consecutive time steps contain zero or extremely "
+                "small differences which will cause the ODE solver to underflow. "
+                "Check caller for t0/t1/steps (received tspan=%s)." % (tspan,)
+            )
+
+
         solver_options = {"dtype": torch.float32}
         res = odeint(self.func, (x, logp0), tspan, atol=1e-5, rtol=1e-5, options=solver_options)
         assert res is not None, "ODE integration failed during flow"

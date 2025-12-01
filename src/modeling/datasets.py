@@ -52,6 +52,12 @@ class CFDEndpointDataset(Dataset):
         history = bundle["history"]
         timesteps = bundle["timesteps"]
         traj = history[:, record.index, :]  # (T, 2)
+        # Validate trajectory numeric health early to provide a clear error
+        # that points to the offending bundle and particle index.
+        if not np.isfinite(traj).all():
+            raise ValueError(
+                f"Found non-finite values in trajectory bundle {record.bundle_path} for particle index {record.index}"
+            )
         x0 = torch.from_numpy(traj[0]).float()
         x_final = torch.from_numpy(traj[-1]).float()
         duration = float(timesteps[-1] - timesteps[0]) if len(timesteps) > 1 else float(len(traj) - 1)
@@ -93,6 +99,11 @@ class CFDTrajectorySequenceDataset(Dataset):
         history = bundle["history"]
         timesteps = bundle["timesteps"]
         traj = torch.from_numpy(history[:, record.index, :]).float()  # (T, 2)
+        # Validate numeric health of the loaded trajectory
+        if not torch.isfinite(traj).all():
+            raise ValueError(
+                f"Found non-finite values in trajectory bundle {record.bundle_path} for particle index {record.index}"
+            )
         if len(timesteps) == traj.shape[0]:
             times = torch.from_numpy(timesteps).float()
             duration = float(timesteps[-1] - timesteps[0]) if len(timesteps) > 1 else 1.0

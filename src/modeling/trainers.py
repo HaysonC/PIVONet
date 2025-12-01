@@ -63,6 +63,13 @@ def train_cnf_model(
             x_final, _x0, _theta, context = batch
             x_final = x_final.to(device=device, dtype=torch.float32)
             context = context.to(device=device, dtype=torch.float32)
+            # Defensive check: ensure inputs are finite before calling model
+            if not torch.isfinite(x_final).all() or not torch.isfinite(context).all():
+                raise ValueError(
+                    "Encountered non-finite values in training batch. "
+                    "Check trajectory bundles for NaNs/Infs. "
+                    f"Batch info: step={step}, loader_len={total}"
+                )
             log_prob = model.log_prob(x_final, context)
             loss = -log_prob.mean()
             loss_value = float(loss.item())

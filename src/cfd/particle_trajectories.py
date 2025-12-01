@@ -97,7 +97,25 @@ class ParticleTrajectorySimulator:
             else:
                 sampled_velocity = self._sample_velocity(field, num_particles)
 
+            # Defensive: ensure sampled velocities are numeric. Some exported
+            # velocity snapshots can contain NaNs/Infs (e.g., masked regions);
+            # applying these to positions will quickly produce NaN trajectories.
+            if not np.isfinite(sampled_velocity).all():
+                # Attempt to salvage by replacing non-finite entries with zeros
+                # (no advection for those particles this step) and warn once.
+                bad_mask = ~np.isfinite(sampled_velocity)
+                sampled_velocity = np.where(bad_mask, 0.0, sampled_velocity)
+                print(
+                    "Warning: encountered non-finite velocities in snapshot; "
+                    "replacing them with zeros to avoid NaN trajectories."
+                )
+
             diffusion_noise = self._diffusion_noise(num_particles, dt_step)
+            if not np.isfinite(diffusion_noise).all():
+                # If diffusion computation somehow produced non-finite values,
+                # replace with zeros to avoid corrupting positions.
+                diffusion_noise = np.where(~np.isfinite(diffusion_noise), 0.0, diffusion_noise)
+
             positions = positions + sampled_velocity * dt_step + diffusion_noise
 
             history.append(positions.copy())
