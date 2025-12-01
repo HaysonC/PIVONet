@@ -45,7 +45,6 @@ pyarrow==21.0.0
 pydeck==0.9.1
 pyfr==2.1
 Pygments==2.19.2
-pyobjc-core==12.1
 pyopencl==2025.2.7
 pyparsing==3.2.5
 python-dateutil==2.9.0.post0
