@@ -56,6 +56,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--context-dim", type=int, default=3, help="Conditioning dimension for the CNF model.")
     parser.add_argument("--z-dim", type=int, default=2, help="Latent dimensionality for the SDE model.")
     parser.add_argument("--ctx-dim", type=int, default=128, help="Encoder context dimensionality inside the SDE model.")
+    parser.add_argument("--drift-hidden", type=int, default=128, help="Hidden units for VSDE posterior drift network.")
     parser.add_argument("--diffusion-learnable", action="store_true", help="Learn the diffusion scale instead of fixing it.")
     parser.add_argument("--viz-trajectories", type=int, default=16, help="Number of trajectories to visualize in the generated plots.")
     return parser.parse_args(argv)
@@ -278,7 +279,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         cnf=cnf_model,
         z_dim=args.z_dim,
         ctx_dim=args.ctx_dim,
-        drift_hidden=args.cnf_hidden_dim,
+        drift_hidden=args.drift_hidden,
         diffusion_learnable=args.diffusion_learnable,
     )
 
