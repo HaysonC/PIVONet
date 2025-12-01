@@ -4,7 +4,7 @@ Physics-Informed Variational ODE Networks (PIVONet) fuses PyFR-based CFD data in
 
 ## Installation
 
-Use any modern Python (>= 3.10). The project ships with a `pyproject.toml`, so you can install it directly:
+Use strictly Python (= 3.11). The project ships with a `pyproject.toml`, so you can install it directly:
 
 ```bash
 python -m pip install .
@@ -17,6 +17,12 @@ python -m pip install -e .
 ```
 
 Both commands respect `requirements.txt`, so you get the same dependency set used in the repo.
+
+**Note:** For the interactive trajectory viewer, install Taichi separately:
+
+```bash
+pip install taichi
+```
 
 ## Usage
 
@@ -34,18 +40,20 @@ The CLI lets you import velocity snapshots, visualize saved bundles, sketch velo
 
 Select **experiment** from the CLI menu (or run `pivo --list-experiments` / `pivo --run-experiment <slug>`) to inspect YAML pipelines stored under `src/experiments/`. Each YAML file defines metadata plus a list of steps that invoke helper scripts. When you choose a pipeline, the orchestrator detects your compute device, prints `[m/n]` progress labels, and shows a Rich loading bar while each script runs. Try the included `demo-baseline` pipeline for a quick sanity check (`pivo --run-experiment demo-baseline`).
 
-### Launcher / GUI
+**Note:** To run predefined experiments, ensure that the corresponding density and trajectory data are placed in `data/{experiment}/` directories. These data can be obtained by running the Jupyter notebooks in `src/cfd/jupyter_notebooks/`.
 
-If you prefer the original launcher that lets you choose between CLI and Streamlit GUI, run:
+### Interactive Trajectory Viewer
+
+For an interactive 3D visualization of particle trajectories, use the Taichi-based viewer:
 
 ```bash
-python -m src.main
+python -m src.visualization.viewer_taichi --dataset 2d-euler-vortex
 ```
 
-Or go straight to the GUI once dependencies are installed:
+This launches a GPU-accelerated window where you can play/pause trajectories, adjust particle size, toggle colors, and orbit the camera. If a CNF checkpoint is available under `cache/checkpoints/{dataset}_cnf/`, it will be loaded automatically for interactive generation. Alternatively, specify a custom checkpoint path.
 
 ```bash
-streamlit run src/app/ui.py
+python -m src.visualization.viewer_taichi --dataset 2d-euler-vortex --cnf-checkpoint cache/checkpoints/2d-euler-vortex_cnf/cnf_latest.pt
 ```
 
 ## Project Layout

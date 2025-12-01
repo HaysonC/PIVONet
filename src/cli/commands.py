@@ -126,3 +126,21 @@ def run_modeling(options: LaunchOptions, channel: InteractionChannel) -> Trainin
     channel.hint(options)
     channel.remember_path("trajectory_bundle", Path(bundle))
     return outcome
+
+
+def run_viewer(options: LaunchOptions, channel: InteractionChannel) -> None:
+    assert options.viewer_dataset, "Viewer command requires a dataset name."
+    channel.say("Launching the Taichi particle trajectory viewer.")
+    try:
+        from ..visualization.viewer_taichi import main as viewer_main
+    except ImportError as e:
+        channel.say(f"Taichi is not installed. Please install it with: pip install taichi")
+        return
+    import sys
+    # Simulate command line args
+    sys.argv = ['viewer_taichi.py', '--dataset', options.viewer_dataset]
+    try:
+        viewer_main()
+    except Exception as e:
+        channel.say(f"Viewer exited with error: {e}")
+    channel.hint(options)

@@ -15,10 +15,10 @@ from ..utils.config import load_config
 from ..utils.console_gate import prompt_gate
 from ..main import welcome_message
 from .chat import FlowChat
-from .commands import run_import, run_velocity, run_visualize, run_modeling
+from .commands import run_import, run_velocity, run_visualize, run_modeling, run_viewer
 from ..utils.orchestrator import ExperimentOrchestrator
 
-CLI_COMMANDS = ("import", "visualize", "velocity", "model", "experiment")
+CLI_COMMANDS = ("import", "visualize", "velocity", "model", "viewer", "experiment")
 
 
 def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -72,6 +72,8 @@ def run_conversational_cli(
                 run_velocity(options, chat)
             elif command == "model":
                 run_modeling(options, chat)
+            elif command == "viewer":
+                run_viewer(options, chat)
         except Exception as error:  # pragma: no cover - interactive shell
             chat.wrap_error(error, options)
 
@@ -91,6 +93,8 @@ def _collect_options(command: str, chat: FlowChat, config: SimulationConfig) -> 
         return _velocity_options(chat)
     if command == "model":
         return _modeling_options(chat)
+    if command == "viewer":
+        return _viewer_options(chat)
     raise ValueError(f"Unsupported command: {command}")
 
 
@@ -201,6 +205,18 @@ def _modeling_options(chat: FlowChat) -> LaunchOptions:
         cnf_steps=int(cnf_steps),
         cnf_lr=float(cnf_lr),
         cnf_hidden_dim=int(cnf_hidden_dim),
+    )
+
+
+def _viewer_options(chat: FlowChat) -> LaunchOptions:
+    with prompt_gate():
+        dataset = questionary.text("Dataset name (folder under ./data)", default="run_demo").ask()
+    
+    assert dataset, "Dataset name is required."
+
+    return LaunchOptions(
+        command="viewer",
+        viewer_dataset=dataset.strip(),
     )
 
 
