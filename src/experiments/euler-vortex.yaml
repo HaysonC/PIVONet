@@ -30,6 +30,7 @@ steps:
       ckpt_dir: cache/checkpoints/2d-euler-vortex_cnf
       device: auto
       limit: 512
+      
   - name: vsde-training
     description: Optimize the variational SDE control module using the freshly trained CNF backbone.
     script: src/workflows/train_variational_sde.py
