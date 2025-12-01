@@ -77,3 +77,4 @@ tzdata==2025.2
 urllib3==2.5.0
 vtk==9.5.2
 wcwidth==0.2.14
+taichi==1.7.4

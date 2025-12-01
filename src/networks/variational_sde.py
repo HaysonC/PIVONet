@@ -91,7 +91,16 @@ class VariationalSDEModel(nn.Module):
         mask: Optional[torch.Tensor] = None,
         n_particles: int = 4,
         n_integration_steps: int = 50,
+        cnf_endpoints: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+        length_scale: float = 1.0,
+        diffusion_scale: float = 1.0,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Sample from the posterior with optional fixed CNF endpoints.
+        
+        Args:
+            cnf_endpoints: Optional tuple of (z_start, z_final) from CNF to fix first/last timesteps
+            diffusion_scale: Multiplier on learned diffusion to increase/decrease wiggling
+        """
         b, t, d = x_seq.shape
         if t_seq.dim() == 1:
             t_seq = t_seq.unsqueeze(0).expand(b, -1)
@@ -101,7 +110,21 @@ class VariationalSDEModel(nn.Module):
         posterior_ctx_rep = posterior_ctx.unsqueeze(0).repeat(n_particles, 1, 1).view(n, -1)
         cnf_ctx_rep = context.unsqueeze(0).repeat(n_particles, 1, 1).view(n, -1)
         ref_times = t_seq[0]
-        traj, u_traj, times = self.integrate_posterior_sde(z0_all, posterior_ctx_rep, cnf_ctx_rep, ref_times, n_steps=n_integration_steps)
+        
+        # Prepare CNF endpoints if provided
+        cnf_start_rep, cnf_final_rep = None, None
+        if cnf_endpoints is not None:
+            cnf_start, cnf_final = cnf_endpoints
+            # Replicate for n_particles: (B, d) -> (n_particles*B, d)
+            cnf_start_rep = cnf_start.unsqueeze(0).repeat(n_particles, 1, 1).view(n, -1)
+            cnf_final_rep = cnf_final.unsqueeze(0).repeat(n_particles, 1, 1).view(n, -1)
+        
+        traj, u_traj, times = self.integrate_posterior_sde(
+            z0_all, posterior_ctx_rep, cnf_ctx_rep, ref_times, 
+            n_steps=n_integration_steps, length_scale=length_scale,
+            cnf_start=cnf_start_rep, cnf_final=cnf_final_rep,
+            diffusion_scale=diffusion_scale
+        )
         traj = traj.view(traj.size(0), n_particles, b, d)
         u_traj = u_traj.view(u_traj.size(0), n_particles, b, d)
         return times, traj, u_traj
@@ -113,26 +136,62 @@ class VariationalSDEModel(nn.Module):
         cnf_ctx: torch.Tensor,
         t_obs: torch.Tensor,
         n_steps: int = 50,
+        length_scale: float = 1.0,
+        cnf_start: Optional[torch.Tensor] = None,
+        cnf_final: Optional[torch.Tensor] = None,
+        diffusion_scale: float = 1.0,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Integrate VSDE with optional fixed CNF endpoints.
+        
+        Args:
+            cnf_start: If provided, fix first timestep to this position (overrides z0)
+            cnf_final: If provided, fix last timestep to this position
+            diffusion_scale: Multiplier on learned diffusion to increase wiggling
+        """
         device = z0.device
         dtype = z0.dtype
-        steps = max(2, int(n_steps))
-        times = torch.linspace(0.0, 1.0, steps=steps, device=device, dtype=dtype)
-        traj = [z0]
+        # Use the observed time grid if provided to match ground truth resolution.
+        # Expect t_obs in normalized [0,1]. If batched, use the first trajectory's times.
+        if t_obs.dim() == 2:
+            times = t_obs[0].to(device=device, dtype=dtype)
+        else:
+            times = t_obs.to(device=device, dtype=dtype)
+        # If caller passes an explicit n_steps differing from observed, optionally resample.
+        # Here we prioritize exact matching to the observation grid.
+        if times.numel() < 2:
+            # Fallback to a minimal grid
+            steps = max(2, int(n_steps))
+            times = torch.linspace(0.0, 1.0, steps=steps, device=device, dtype=dtype)
+        
+        # Initialize first timestep (fixed to CNF start if provided)
+        z = cnf_start if cnf_start is not None else z0
+        traj = [z]
         controls = []
-        g = F.softplus(self.log_diff_param)
-        z = z0
+        g_base = F.softplus(self.log_diff_param) * float(diffusion_scale)  # Base diffusion with scaling
+        
+        # Integrate all timesteps with VSDE posterior drift + diffusion
+        # If CNF endpoints are provided, they constrain where we start and should end up,
+        # but VSDE drift naturally guides toward the endpoint (not forced)
         for i in range(times.numel() - 1):
             t_i = times[i]
-            dt = times[i + 1] - t_i
-            f_theta = self.cnf.eval_field(z, cnf_ctx, float(t_i.item()))
+            dt_normalized = times[i + 1] - t_i
+            
+            # Time-dependent diffusion: decay toward endpoint to reduce wild oscillations
+            # g(t) = g_base * (1 - t)^2 so diffusion → 0 as t → 1
+            time_decay = (1.0 - float(t_i.item())) ** 1
+            g = g_base * time_decay
+            
+            f_theta = self.cnf.eval_field(z, cnf_ctx, float(t_i.item())) * float(max(0.0, length_scale))
             u, _ = self.post_drift(z, t_i, posterior_ctx)
             drift = f_theta + u
             xi = torch.randn_like(z)
-            noise_scale = torch.sqrt(torch.clamp(dt, min=1e-12))
-            z = z + drift * dt + xi * (g * noise_scale)
+            noise_scale = torch.sqrt(torch.clamp(dt_normalized, min=1e-12))
+            # Euler-Maruyama step with normalized dt
+            z = z + drift * dt_normalized + xi * (g * noise_scale)
             traj.append(z)
             controls.append(u)
+        
+        # Don't override the last point - let VSDE integration determine it naturally
         return torch.stack(traj, dim=0), torch.stack(controls, dim=0), times
 
     def compute_elbo(

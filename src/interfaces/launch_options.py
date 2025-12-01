@@ -34,6 +34,8 @@ class LaunchOptions:
     cnf_steps: int = 6
     cnf_lr: float = 2e-4
     cnf_hidden_dim: int = 128
+    # Viewer options
+    viewer_dataset: str | None = None
 
     def command_hint(self) -> str:
         short = f"flow-cli {self.command}"
@@ -53,6 +55,8 @@ class LaunchOptions:
             args.append(f"--input {self.input_path}")
         elif self.command == "model" and self.model_input_path:
             args.append(f"--input {self.model_input_path}")
+        if self.command == "viewer" and self.viewer_dataset:
+            args.append(f"--dataset {self.viewer_dataset}")
         if self.command == "model":
             args.extend([
                 f"--latent {self.encoder_latent_dim}",
@@ -68,4 +72,4 @@ class LaunchOptions:
 
     @classmethod
     def conversational_commands(cls) -> Iterable[str]:
-        return ("import", "visualize", "velocity", "model")
+        return ("import", "visualize", "velocity", "model", "viewer")

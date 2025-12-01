@@ -153,3 +153,18 @@ class CNFModel(nn.Module):
         assert res is not None, "ODE integration failed during sampling"
         x_traj, _ = res
         return x_traj[-1]
+
+    @torch.no_grad()
+    def sample_trajectory(self, n: int, context: torch.Tensor, base_std: float = 1.0, steps: int = 30) -> torch.Tensor:
+        device = context.device
+        dtype = context.dtype
+        z0 = base_std * torch.randn(n, self.dim, device=device, dtype=dtype)
+        # integrate forward from z0 to x by swapping integration direction
+        tspan = torch.linspace(0.0, 1.0, steps=steps, device=device, dtype=dtype)
+        self.func.set_context(context)
+        assert self.func._context is not None, "Context must be set before sampling"
+        solver_options = {"dtype": torch.float32}
+        res = odeint(self.func, (z0, torch.zeros(n, 1, device=device, dtype=dtype)), tspan, atol=1e-5, rtol=1e-5, options=solver_options)
+        assert res is not None, "ODE integration failed during sampling"
+        x_traj, _ = res
+        return x_traj
