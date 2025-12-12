@@ -1,8 +1,8 @@
-slug: 2d-viscous-shock-tube
-name: 2D Viscous Shock Tube CFD Neural Stack 
-description: Train the CNF backbone and variational SDE controller directly on CFD trajectory bundles from the 2D viscous shock tube simulation.
+slug: 2d-inc-cylinder
+name: 2D Incompressible Cylinder CFD Neural Stack 
+description: Train the CNF backbone and variational SDE controller directly on CFD trajectory bundles from the 2D incompressible cylinder simulation.
 usage:
-  - "From the repo root, run `pivo --run-experiment 2d-viscous-shock-tube` to execute the full experiment."
+  - "From the repo root, run `pivo --run-experiment 2d-inc-cylinder` to execute the full experiment."
   - "Alternatively, run pivo and then you can see a list of available experiments to run."
 steps:
   - name: simulate-trajectories
@@ -12,22 +12,22 @@ steps:
       particles: 1024
       max-steps: 240
       dt: 0.01
-      output-dir: data/2d-viscous-shock-tube/trajectories
-      velocity-dir: data/2d-viscous-shock-tube/velocity
+      output-dir: data/2d-inc-cylinder/trajectories
+      velocity-dir: data/2d-inc-cylinder/velocity
       
   - name: cnf-training
     description: Fit the continuous normalizing flow on CFD bundle endpoints to learn the base dynamics.
     script: src/workflows/train_cnf.py
     params:
       bundles:
-        - data/2d-viscous-shock-tube/trajectories
+        - data/2d-inc-cylinder/trajectories
       batch_size: 512
       epochs: 8
       lr: 0.001
       hidden_dim: 64
       depth: 3
       context_dim: 3
-      ckpt_dir: cache/checkpoints/2d-viscous-shock-tube_cnf
+      ckpt_dir: cache/checkpoints/2d-inc-cylinder_cnf
       device: auto
       limit: 512
   - name: vsde-training
@@ -35,7 +35,7 @@ steps:
     script: src/workflows/train_variational_sde.py
     params:
       bundles:
-        - data/2d-viscous-shock-tube/trajectories
+        - data/2d-inc-cylinder/trajectories
       batch_size: 128
       epochs: 4
       lr: 0.005
@@ -44,9 +44,9 @@ steps:
       obs_std: 0.05
       kl_warmup: 1.0
       control_cost_scale: 1.0
-      ckpt_dir: cache/checkpoints/2d-viscous-shock-tube_vsde
+      ckpt_dir: cache/checkpoints/2d-inc-cylinder_vsde
       device: auto
-      cnf_checkpoint: cache/checkpoints/2d-viscous-shock-tube_cnf/cnf_latest.pt
+      cnf_checkpoint: cache/checkpoints/2d-inc-cylinder_cnf/cnf_latest.pt
       cnf_hidden_dim: 64
       cnf_depth: 3
       context_dim: 3
@@ -63,13 +63,13 @@ steps:
     script: src/workflows/run_vsde_inference.py
     params:
       bundles:
-        - data/2d-viscous-shock-tube/trajectories
+        - data/2d-inc-cylinder/trajectories
       batch_size: 64
       workers: 0
       limit: 256
       device: auto
-      cnf_checkpoint: cache/checkpoints/2d-viscous-shock-tube_cnf/cnf_latest.pt
-      vsde_checkpoint: cache/checkpoints/2d-viscous-shock-tube_vsde/vsde_latest.pt
+      cnf_checkpoint: cache/checkpoints/2d-inc-cylinder_cnf/cnf_latest.pt
+      vsde_checkpoint: cache/checkpoints/2d-inc-cylinder_vsde/vsde_latest.pt
       cnf_hidden_dim: 64
       cnf_depth: 3
       context_dim: 3
@@ -80,24 +80,24 @@ steps:
       n_integration_steps: 60
       viz_trajectories: 48
       overlay_max_paths: 35
-      output_dir: cache/artifacts/2d-viscous-shock-tube/vsde_inference
+      output_dir: cache/artifacts/2d-inc-cylinder/vsde_inference
       overlay_dir: overlays
   - name: velocity-visualization
     description: Sample a raw CFD velocity snapshot and render a flowing phase-space plot for QA.
     script: src/workflows/render_velocity_field.py
     params:
-      input: data/2d-viscous-shock-tube/velocity
-      output: cache/artifacts/2d-viscous-shock-tube/velocity_phase.png
+      input: data/2d-inc-cylinder/velocity
+      output: cache/artifacts/2d-inc-cylinder/velocity_phase.png
       samples: 50000
       cmap: plasma
       title: "CFD velocity phase space"
   - name: velocity-animation
-    description: Build a quiver animation across all velocity snapshots to inspect the temporal structure.
+    description: Build a quiver animation across all velocity snapshots to inspect the unsteady wake.
     script: src/workflows/render_velocity_animations.py
     params:
-      velocity-dir: data/2d-viscous-shock-tube/velocity
-      output: cache/artifacts/2d-viscous-shock-tube/velocity_evolution.gif
+      velocity-dir: data/2d-inc-cylinder/velocity
+      output: cache/artifacts/2d-inc-cylinder/velocity_evolution.gif
       save-preview: true
       vector-stride: 3
-      fps: 10
+      fps: 12
       device: auto

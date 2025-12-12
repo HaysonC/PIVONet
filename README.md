@@ -56,6 +56,18 @@ This launches a GPU-accelerated window where you can play/pause trajectories, ad
 python -m src.visualization.viewer_taichi --dataset 2d-euler-vortex --cnf-checkpoint cache/checkpoints/2d-euler-vortex_cnf/cnf_latest.pt
 ```
 
+### Velocity Animation Workflow
+
+To render quiver animations directly from CFD velocity snapshots (either for a single flow or by scanning an entire data root), invoke the workflow helper:
+
+```bash
+python -m src.workflows.render_velocity_animations --velocity-dir data/2d-euler-vortex/velocity --output cache/artifacts/2d-euler-vortex/velocity_evolution.gif --save-preview --vector-stride 3 --fps 12 --device auto
+```
+
+Omit `--velocity-dir` to let the script crawl `--velocity-root` (defaults to `data/`) and produce animations for every detected flow automatically. Pass `--device auto` (default) to prefer Apple MPS when PyTorch/MPS is available, falling back to CPU otherwise.
+
+Prefer YAML pipelines? Run `pivo --run-experiment velocity-animations` to sweep every flow using the orchestrator with Rich progress output.
+
 ## Project Layout
 
 - `src/` – Core Python package (CLI, CFD utilities, hybrid models, visualization helpers).

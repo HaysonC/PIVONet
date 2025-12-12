@@ -41,3 +41,16 @@ This document walks through the supported interfaces of the Flow project and sha
 - Pipelines are regular YAML files—copy `src/experiments/demo-baseline.yaml` to add new experiments, point each step at scripts or commands you need, and the orchestrator will handle ordering and progress UI for you.
 
 Refer here whenever you need a refresher—Flow will remind you of this guide after each run so automation is painless.
+
+## Velocity Animation Workflow
+
+Need a quick QA pass on the CFD velocity fields themselves? Run the Rich-enabled workflow helper to build quiver animations straight from the `.npy` snapshots:
+
+```bash
+python -m src.workflows.render_velocity_animations --velocity-dir data/2d-viscous-shock-tube/velocity --output cache/artifacts/2d-viscous-shock-tube/velocity_evolution.gif --save-preview --device auto
+```
+
+- Omit `--velocity-dir` to let the script crawl `--velocity-root` (defaults to `data/`) and render every flow it finds.
+- The orchestrator-compatible CLI flags mean you can add the helper as a YAML experiment step (see `velocity-animation` in the packaged pipelines).
+- `--device auto` prefers Apple MPS when PyTorch/MPS is present but gracefully falls back to CPU.
+- A fully automated pipeline ships as `pivo --run-experiment velocity-animations`, which scans the default data root and writes GIFs + previews to `cache/artifacts/<flow>/`.

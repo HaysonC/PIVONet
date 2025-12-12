@@ -1,0 +1,19 @@
+slug: velocity-animations
+name: Velocity Animation Sweep
+description: Automatically render velocity-evolution animations for every CFD flow discovered under the configured data root.
+usage:
+  - "Run `pivo --run-experiment velocity-animations` to generate GIFs + previews for all velocity directories under the default data root."
+  - "Override parameters with `pivo --run-experiment velocity-animations --set step.parameter=value` (e.g., `--set animation.vector-stride=5`)."
+steps:
+  - name: animation
+    description: Discover velocity folders and render quiver animations with previews for each flow.
+    script: src/workflows/render_velocity_animations.py
+    params:
+      velocity-root: data
+      output-root: cache/artifacts
+      save-preview: true
+      max-frames: 240
+      frame-stride: 1
+      vector-stride: 3
+      fps: 12
+      device: auto
