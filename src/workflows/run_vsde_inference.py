@@ -62,6 +62,12 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Discretization steps for the posterior SDE sampler.",
     )
     parser.add_argument(
+        "--integrator",
+        default="euler",
+        choices=("euler", "improved_euler", "rk4"),
+        help="Numerical integrator for VSDE drift (diffusion via Euler–Maruyama).",
+    )
+    parser.add_argument(
         "--viz-trajectories",
         type=int,
         default=32,
@@ -123,14 +129,14 @@ def _resolve_paths(specs: Sequence[str]) -> list[Path]:
     return resolved
 
 
-def _select_device(preference: str) -> str:
-    if preference != "auto":
-        return preference
+def _select_device(preference: str) -> torch.device:
+    if preference != "auto":  # pragma: no cover - hardware specific
+        return torch.device(preference)
     if torch.cuda.is_available():  # pragma: no cover - hardware specific
-        return "cuda"
+        return torch.device("cuda")
     if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():  # pragma: no cover - hardware specific
-        return "mps"
-    return "cpu"
+        return torch.device("mps")
+    return torch.device("cpu")
 
 
 def _resolve_path(path_like: str) -> Path:
@@ -504,7 +510,7 @@ def _resample_time_axis(data: np.ndarray, target_steps: int) -> np.ndarray:
     return result
 
 
-def _time_major_required(array: torch.Tensor, expected_steps: int) -> np.ndarray:
+def _time_major_required_exact(array: torch.Tensor, expected_steps: int) -> np.ndarray:
     data = array.detach().cpu().numpy()
     if data.ndim != 3:
         raise ValueError("Trajectory tensor must be 3D: (time, batch, coord)")
@@ -662,6 +668,7 @@ def _prepare_overlay_arrays(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray | None]:
     time_axis = _ensure_time_axis(times)
     steps = time_axis.shape[0]
+    # Use the flexible resampling variant to ensure shape alignment
     vsde_np = _time_major_required(vsde_hist, steps)
     gt_np = _time_major_required(gt, steps)
     cnf_np = _time_major_optional(cnf_hist, steps)
@@ -890,7 +897,7 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     device = _select_device(args.device)
     vsde = vsde.to(device).eval()
-    console.print(f"Running VSDE inference on device: {device}")
+    console.print(f"Running VSDE inference on device: {device.type}")
 
     artifact_base, plots_dir, bundles_dir = _ensure_output_dirs(args.output_dir)
     overlay_dir = _resolve_overlay_dir(args.overlay_dir, artifact_base, plots_dir)
@@ -955,6 +962,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                 cnf_endpoints=(cnf_start, cnf_final),  # Fix VSDE endpoints to CNF
                 length_scale=length_scale,
                 diffusion_scale=diffusion_scale,
+                integrator=args.integrator,
             )
             
             # Apply endpoint correction to VSDE: fix final position while keeping start fixed
@@ -1014,9 +1022,10 @@ def main(argv: Sequence[str] | None = None) -> None:
                     length_scale=length_scale,
                 )
                 sample_cnf = cnf_path.detach().cpu()
-            generated = sample_vsde.numpy()
-            vsde_result = TrajectoryResult(history=generated, timesteps=sample_times.numpy().tolist())
-            _render_sample(vsde_result, plots_dir, bundles_dir, "vsde_generated", console)
+            if sample_vsde is not None and sample_times is not None:
+                generated = sample_vsde.numpy()
+                vsde_result = TrajectoryResult(history=generated, timesteps=sample_times.numpy().tolist())
+                _render_sample(vsde_result, plots_dir, bundles_dir, "vsde_generated", console)
             rendered_sample = True
 
         if args.max_batches is not None and batch_idx >= args.max_batches:

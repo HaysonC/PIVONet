@@ -7,7 +7,11 @@ import subprocess
 import sys
 from typing import Sequence
 
+from rich.console import Console
+from rich.panel import Panel
 import questionary
+
+console = Console()
 
 from .utils.config import load_config
 from .utils.paths import project_root
@@ -75,13 +79,23 @@ def main(argv: Sequence[str] | None = None) -> None:
         return
 
     with prompt_gate():
+        console.print(
+            Panel(
+                "[bold yellow]Warning:[/bold yellow]\n"
+                "The GUI mode is unstable and experimental. It may lead to crashes or unexpected behavior.\n"
+                "For the safest and most robust experience, choose **CLI**.",
+                border_style="yellow",
+            )
+        )
+
         choice = questionary.select(
             "Select interface:",
             choices=[
-                questionary.Choice(title="Command-Line (CLI)", value="cli"),
-                questionary.Choice(title="Graphical (GUI)", value="gui"),
+                questionary.Choice(title="[CLI] Command-Line (recommended)", value="cli"),
+                questionary.Choice(title="[GUI] Graphical - not recommended", value="gui"),
             ],
         ).ask()
+
 
     if choice == "gui":
         _launch_streamlit_app()

@@ -94,6 +94,7 @@ class VariationalSDEModel(nn.Module):
         cnf_endpoints: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
         length_scale: float = 1.0,
         diffusion_scale: float = 1.0,
+        integrator: str = "euler",
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Sample from the posterior with optional fixed CNF endpoints.
         
@@ -123,7 +124,8 @@ class VariationalSDEModel(nn.Module):
             z0_all, posterior_ctx_rep, cnf_ctx_rep, ref_times, 
             n_steps=n_integration_steps, length_scale=length_scale,
             cnf_start=cnf_start_rep, cnf_final=cnf_final_rep,
-            diffusion_scale=diffusion_scale
+            diffusion_scale=diffusion_scale,
+            integrator=integrator
         )
         traj = traj.view(traj.size(0), n_particles, b, d)
         u_traj = u_traj.view(u_traj.size(0), n_particles, b, d)
@@ -140,6 +142,7 @@ class VariationalSDEModel(nn.Module):
         cnf_start: Optional[torch.Tensor] = None,
         cnf_final: Optional[torch.Tensor] = None,
         diffusion_scale: float = 1.0,
+        integrator: str = "euler",
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Integrate VSDE with optional fixed CNF endpoints.
         
@@ -147,6 +150,8 @@ class VariationalSDEModel(nn.Module):
             cnf_start: If provided, fix first timestep to this position (overrides z0)
             cnf_final: If provided, fix last timestep to this position
             diffusion_scale: Multiplier on learned diffusion to increase wiggling
+            integrator: One of {"euler", "improved_euler", "rk4"}. For SDEs, diffusion is applied via
+                Euler-Maruyama in all modes; the drift component uses the chosen integrator.
         """
         device = z0.device
         dtype = z0.dtype
@@ -172,24 +177,68 @@ class VariationalSDEModel(nn.Module):
         # Integrate all timesteps with VSDE posterior drift + diffusion
         # If CNF endpoints are provided, they constrain where we start and should end up,
         # but VSDE drift naturally guides toward the endpoint (not forced)
+        integrator = integrator.lower()
         for i in range(times.numel() - 1):
             t_i = times[i]
-            dt_normalized = times[i + 1] - t_i
+            t_next = times[i + 1]
+            dt_normalized = t_next - t_i
             
             # Time-dependent diffusion: decay toward endpoint to reduce wild oscillations
             # g(t) = g_base * (1 - t)^2 so diffusion → 0 as t → 1
             time_decay = (1.0 - float(t_i.item())) ** 1
             g = g_base * time_decay
-            
+
+            # Evaluate drift terms
             f_theta = self.cnf.eval_field(z, cnf_ctx, float(t_i.item())) * float(max(0.0, length_scale))
             u, _ = self.post_drift(z, t_i, posterior_ctx)
             drift = f_theta + u
+
+            if integrator == "euler":
+                z_proposed = z + drift * dt_normalized
+                controls.append(u)
+            elif integrator in ("improved_euler", "heun"):
+                # Heun's method: predictor-corrector on drift
+                z_pred = z + drift * dt_normalized
+                f_theta_pred = self.cnf.eval_field(z_pred, cnf_ctx, float(t_next.item())) * float(max(0.0, length_scale))
+                u_pred, _ = self.post_drift(z_pred, t_next, posterior_ctx)
+                drift_corr = 0.5 * (drift + (f_theta_pred + u_pred))
+                z_proposed = z + drift_corr * dt_normalized
+                controls.append(u)
+            elif integrator == "rk4":
+                # Classical RK4 on drift part; diffusion stays Euler-Maruyama
+                k1_f = self.cnf.eval_field(z, cnf_ctx, float(t_i.item())) * float(max(0.0, length_scale))
+                k1_u, _ = self.post_drift(z, t_i, posterior_ctx)
+                k1 = k1_f + k1_u
+
+                z2 = z + 0.5 * dt_normalized * k1
+                t2 = t_i + 0.5 * dt_normalized
+                k2_f = self.cnf.eval_field(z2, cnf_ctx, float(t2.item())) * float(max(0.0, length_scale))
+                k2_u, _ = self.post_drift(z2, t2, posterior_ctx)
+                k2 = k2_f + k2_u
+
+                z3 = z + 0.5 * dt_normalized * k2
+                t3 = t_i + 0.5 * dt_normalized
+                k3_f = self.cnf.eval_field(z3, cnf_ctx, float(t3.item())) * float(max(0.0, length_scale))
+                k3_u, _ = self.post_drift(z3, t3, posterior_ctx)
+                k3 = k3_f + k3_u
+
+                z4 = z + dt_normalized * k3
+                t4 = t_next
+                k4_f = self.cnf.eval_field(z4, cnf_ctx, float(t4.item())) * float(max(0.0, length_scale))
+                k4_u, _ = self.post_drift(z4, t4, posterior_ctx)
+                k4 = k4_f + k4_u
+
+                drift_rk = (k1 + 2 * k2 + 2 * k3 + k4) / 6.0
+                z_proposed = z + drift_rk * dt_normalized
+                controls.append(k1_u)  # log first-stage control for analysis
+            else:
+                raise ValueError(f"Unknown integrator: {integrator}. Use 'euler', 'improved_euler', or 'rk4'.")
+
+            # Add diffusion via Euler-Maruyama
             xi = torch.randn_like(z)
             noise_scale = torch.sqrt(torch.clamp(dt_normalized, min=1e-12))
-            # Euler-Maruyama step with normalized dt
-            z = z + drift * dt_normalized + xi * (g * noise_scale)
+            z = z_proposed + xi * (g * noise_scale)
             traj.append(z)
-            controls.append(u)
         
         # Don't override the last point - let VSDE integration determine it naturally
         return torch.stack(traj, dim=0), torch.stack(controls, dim=0), times
