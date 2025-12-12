@@ -1,0 +1,117 @@
+slug: integrator-comparison
+name: VSDE Integrator Comparison
+description: Compare Euler, improved Euler, RK4, and Dormand-Prince (DOPRI5) integrators for the VSDE drift component on the 2D Euler vortex dataset.
+usage:
+  - "Run `pivo --run-experiment integrator-comparison` to evaluate each method and inspect the generated overlays."
+steps:
+  - name: vsde-inference-euler
+    description: Baseline inference using the default Euler drift integrator.
+    script: src/workflows/run_vsde_inference.py
+    params:
+      bundles:
+        - data/2d-euler-vortex/trajectories
+      batch_size: 64
+      workers: 0
+      limit: 256
+      device: auto
+      cnf_checkpoint: cache/checkpoints/2d-euler-vortex_cnf/cnf_latest.pt
+      vsde_checkpoint: cache/checkpoints/2d-euler-vortex_vsde/vsde_latest.pt
+      cnf_hidden_dim: 64
+      cnf_depth: 3
+      context_dim: 3
+      z_dim: 2
+      ctx_dim: 128
+      diffusion_learnable: true
+      n_particles: 64
+      n_integration_steps: 100
+      integrator: euler
+      viz_trajectories: 32
+      overlay_max_paths: 20
+      output_dir: cache/artifacts/integrator-comparison/euler
+      overlay_dir: overlays/euler
+  - name: vsde-inference-improved
+    description: Inference using Heun's improved Euler method for the drift portion.
+    script: src/workflows/run_vsde_inference.py
+    params:
+      bundles:
+        - data/2d-euler-vortex/trajectories
+      batch_size: 64
+      workers: 0
+      limit: 256
+      device: auto
+      cnf_checkpoint: cache/checkpoints/2d-euler-vortex_cnf/cnf_latest.pt
+      vsde_checkpoint: cache/checkpoints/2d-euler-vortex_vsde/vsde_latest.pt
+      cnf_hidden_dim: 64
+      cnf_depth: 3
+      context_dim: 3
+      z_dim: 2
+      ctx_dim: 128
+      diffusion_learnable: true
+      n_particles: 64
+      n_integration_steps: 100
+      integrator: improved_euler
+      viz_trajectories: 32
+      overlay_max_paths: 20
+      output_dir: cache/artifacts/integrator-comparison/improved-euler
+      overlay_dir: overlays/improved-euler
+  - name: vsde-inference-rk4
+    description: Inference using the classical RK4 integrator for the drift component.
+    script: src/workflows/run_vsde_inference.py
+    params:
+      bundles:
+        - data/2d-euler-vortex/trajectories
+      batch_size: 64
+      workers: 0
+      limit: 256
+      device: auto
+      cnf_checkpoint: cache/checkpoints/2d-euler-vortex_cnf/cnf_latest.pt
+      vsde_checkpoint: cache/checkpoints/2d-euler-vortex_vsde/vsde_latest.pt
+      cnf_hidden_dim: 64
+      cnf_depth: 3
+      context_dim: 3
+      z_dim: 2
+      ctx_dim: 128
+      diffusion_learnable: true
+      n_particles: 64
+      n_integration_steps: 100
+      integrator: rk4
+      viz_trajectories: 32
+      overlay_max_paths: 20
+      output_dir: cache/artifacts/integrator-comparison/rk4
+      overlay_dir: overlays/rk4
+  - name: vsde-inference-dopri5
+    description: Inference using the Dormand-Prince (DOPRI5) adaptive integrator for the drift component.
+    script: src/workflows/run_vsde_inference.py
+    params:
+      bundles:
+        - data/2d-euler-vortex/trajectories
+      batch_size: 64
+      workers: 0
+      limit: 256
+      device: auto
+      cnf_checkpoint: cache/checkpoints/2d-euler-vortex_cnf/cnf_latest.pt
+      vsde_checkpoint: cache/checkpoints/2d-euler-vortex_vsde/vsde_latest.pt
+      cnf_hidden_dim: 64
+      cnf_depth: 3
+      context_dim: 3
+      z_dim: 2
+      ctx_dim: 128
+      diffusion_learnable: true
+      n_particles: 64
+      n_integration_steps: 100
+      integrator: dopri5
+      viz_trajectories: 32
+      overlay_max_paths: 20
+      output_dir: cache/artifacts/integrator-comparison/dopri5
+      overlay_dir: overlays/dopri5
+  - name: comparison-charts
+    description: Plot aggregate VSDE vs CNF metric comparisons across the integrator runs.
+    script: src/experiments/scripts/compare_integrators.py
+    params:
+      artifact-root: cache/artifacts/integrator-comparison
+      output-dir: cache/artifacts/integrator-comparison/charts
+      methods:
+        - euler
+        - improved-euler
+        - rk4
+        - dopri5

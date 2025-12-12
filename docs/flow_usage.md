@@ -46,3 +46,11 @@ python -m src.workflows.render_velocity_animations --velocity-dir data/2d-viscou
 - The orchestrator-compatible CLI flags mean you can add the helper as a YAML experiment step (see `velocity-animation` in the packaged pipelines).
 - `--device auto` prefers Apple MPS when PyTorch/MPS is present but gracefully falls back to CPU.
 - A fully automated pipeline ships as `pivo --run-experiment velocity-animations`, which scans the default data root and writes GIFs + previews to `cache/artifacts/<flow>/`.
+
+## VSDE Inference Integrator Comparison
+
+Pass `--integrator` (`euler`, `improved_euler`, `rk4`, or `dopri5`) to `src/workflows/run_vsde_inference.py` to swap the deterministic drift solver while diffusion noise still uses Euler–Maruyama. Run `pivo --run-experiment integrator-comparison` to execute inference with every integrator and compare overlays under `cache/artifacts/integrator-comparison/<method>`. You can also call the workflow directly with your preferred integrator flag when reproducing specific solver behavior.
+
+The experiment now ends with a `compare_integrators.py` helper that compiles the MAE metrics across the runs and writes `comparison_mae.png` plus `comparison_summary.json` under `cache/artifacts/integrator-comparison/charts/`.
+
+````

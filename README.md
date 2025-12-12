@@ -689,55 +689,26 @@ tspan = torch.linspace(0, 1, 10)  # ✓ Good
 
 **Solutions**:
 ```bash
-# Reduce batch size
-python -m src.workflows.train_cnf \
-    --trajectory data/traj.npz \
-    --batch-size 8  # Instead of 32
-
-# Or reduce hidden dimension
---hidden-dim 64  # Instead of 256
+python -m src.workflows.render_velocity_animations --velocity-dir data/2d-euler-vortex/velocity --output cache/artifacts/2d-euler-vortex/velocity_evolution.gif --save-preview --vector-stride 3 --fps 12 --device auto
 ```
 
-### 5. NaN Loss During Training
+Omit `--velocity-dir` to let the script crawl `--velocity-root` (defaults to `data/`) and produce animations for every detected flow automatically. Pass `--device auto` (default) to prefer Apple MPS when PyTorch/MPS is available, falling back to CPU otherwise.
 
-**Cause**: Unstable ODE solver or input normalization issue.
+Prefer YAML pipelines? Run `pivo --run-experiment velocity-animations` to sweep every flow using the orchestrator with Rich progress output.
 
-**Solutions**:
-```python
-# 1. Check input normalization
-dataset.normalize = True  # Ensure True
+### VSDE Inference Integrator Comparison
 
-# 2. Reduce learning rate
-learning_rate = 1e-4  # From 1e-3
+`src/workflows/run_vsde_inference.py` now exposes a `--integrator` flag (choices: `euler`, `improved_euler`, `rk4`, `dopri5`) so you can target different drift solvers while diffusion always uses Euler–Maruyama. Run `pivo --run-experiment integrator-comparison` to execute inference with each integrator back-to-back and inspect the overlays living under `cache/artifacts/integrator-comparison/<method>`.
 
-# 3. Reduce step size for integration
-dt = 0.001  # From 0.01
+The final step of the experiment runs `src/experiments/scripts/compare_integrators.py`, which produces `cache/artifacts/integrator-comparison/charts/comparison_mae.png` plus a summary JSON detailing the VSDE/CNF MAE per integrator.
 
-# 4. Use gradient clipping
-torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-```
+## Project Layout
 
----
-
-## Contributing
-
-Contributions are welcome! Areas for improvement:
-
-- [ ] Multi-GPU training via DistributedDataParallel
-- [ ] Uncertainty quantification via ensemble methods
-- [ ] 3D trajectory support (currently 2D)
-- [ ] PyFR CFD solver integration (currently .npy only)
-- [ ] More velocity field benchmarks
-- [ ] TensorFlow/JAX implementations
-
-Please:
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
----
+- `src/` – Core Python package (CLI, CFD utilities, hybrid models, visualization helpers).
+- `docs/flow_usage.md` – Detailed walkthrough of both interfaces and automation tips.
+- `src/experiments/` – YAML experiment definitions and helper scripts.
+- `config.yml` – Simulation defaults shared by CLI/GUI.
+- `requirements.txt` – Exact dependency pins reused by the packaging metadata.
 
 ## License
 
