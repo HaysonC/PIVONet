@@ -68,6 +68,12 @@ Omit `--velocity-dir` to let the script crawl `--velocity-root` (defaults to `da
 
 Prefer YAML pipelines? Run `pivo --run-experiment velocity-animations` to sweep every flow using the orchestrator with Rich progress output.
 
+### VSDE Inference Integrator Comparison
+
+`src/workflows/run_vsde_inference.py` now exposes a `--integrator` flag (choices: `euler`, `improved_euler`, `rk4`, `dopri5`) so you can target different drift solvers while diffusion always uses Euler–Maruyama. Run `pivo --run-experiment integrator-comparison` to execute inference with each integrator back-to-back and inspect the overlays living under `cache/artifacts/integrator-comparison/<method>`.
+
+The final step of the experiment runs `src/experiments/scripts/compare_integrators.py`, which produces `cache/artifacts/integrator-comparison/charts/comparison_mae.png` plus a summary JSON detailing the VSDE/CNF MAE per integrator.
+
 ## Project Layout
 
 - `src/` – Core Python package (CLI, CFD utilities, hybrid models, visualization helpers).

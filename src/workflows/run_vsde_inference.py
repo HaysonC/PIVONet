@@ -64,7 +64,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--integrator",
         default="euler",
-        choices=("euler", "improved_euler", "rk4"),
+        choices=("euler", "improved_euler", "rk4", "dopri5"),
         help="Numerical integrator for VSDE drift (diffusion via Euler–Maruyama).",
     )
     parser.add_argument(
@@ -509,14 +509,6 @@ def _resample_time_axis(data: np.ndarray, target_steps: int) -> np.ndarray:
             result[:, traj_idx, coord] = np.interp(dest, orig, data[:, traj_idx, coord])
     return result
 
-
-def _time_major_required_exact(array: torch.Tensor, expected_steps: int) -> np.ndarray:
-    data = array.detach().cpu().numpy()
-    if data.ndim != 3:
-        raise ValueError("Trajectory tensor must be 3D: (time, batch, coord)")
-    if data.shape[0] == expected_steps:
-        return data
-    raise ValueError(f"Expected {expected_steps} time steps, got {data.shape[0]}")
 
 
 def _compute_adaptive_scales(

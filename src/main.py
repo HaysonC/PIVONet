@@ -52,7 +52,7 @@ def _launch_streamlit_app() -> None:
 def _parse_args(argv: Sequence[str]) -> tuple[argparse.Namespace, list[str]]:
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--gui", action="store_true", help="Launch the graphical Streamlit UI and exit.")
-    parser.add_argument("--cli", action="store_true", help="Force the conversational CLI (default).")
+    parser.add_argument("--cli", action="store_true", help="Launch the conversational CLI (default).")
     parser.add_argument("--no-banner", action="store_true", help="Suppress the ASCII welcome message.")
     return parser.parse_known_args(argv)
 

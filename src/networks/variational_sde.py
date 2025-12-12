@@ -231,8 +231,37 @@ class VariationalSDEModel(nn.Module):
                 drift_rk = (k1 + 2 * k2 + 2 * k3 + k4) / 6.0
                 z_proposed = z + drift_rk * dt_normalized
                 controls.append(k1_u)  # log first-stage control for analysis
+            elif integrator == "dopri5":
+                # Dormand-Prince RK5(4) method on drift part; diffusion stays Euler-Maruyama
+                # Coefficients from "Numerical Recipes" and Wikipedia
+                a = [0, 1/5, 3/10, 4/5, 8/9, 1]
+                b = [
+                    [],
+                    [1/5],
+                    [3/40, 9/40],
+                    [44/45, -56/15, 32/9],
+                    [19372/6561, -25360/2187, 64448/6561, -212/729],
+                    [9017/3168, -355/33, 46732/5247, 49/176, -5103/18656],
+                ]
+                c = [35/384, 0, 500/1113, 125/192, -2187/6784, 11/84]
+
+                k = []
+                for s in range(6):
+                    z_s = z.clone()
+                    for j in range(s):
+                        if b[s]:
+                            z_s = z_s + dt_normalized * b[s][j] * k[j]
+                    t_s = t_i + a[s] * dt_normalized
+                    f_theta_s = self.cnf.eval_field(z_s, cnf_ctx, float(t_s.item())) * float(max(0.0, length_scale))
+                    u_s, _ = self.post_drift(z_s, t_s, posterior_ctx)
+                    k_s = f_theta_s + u_s
+                    k.append(k_s)
+
+                drift_rk = sum(c[s] * k[s] for s in range(6))
+                z_proposed = z + drift_rk * dt_normalized
+                controls.append(k[0])  # log first-stage control for analysis
             else:
-                raise ValueError(f"Unknown integrator: {integrator}. Use 'euler', 'improved_euler', or 'rk4'.")
+                raise ValueError(f"Unknown integrator: {integrator}. Use 'euler', 'improved_euler', 'rk4', or 'dopri5'.")
 
             # Add diffusion via Euler-Maruyama
             xi = torch.randn_like(z)
