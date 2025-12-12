@@ -81,45 +81,45 @@ Expected output:
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│                       User Input (CLI)                          │
+│                       User Input (CLI)                         │
 └──────────────────────────┬─────────────────────────────────────┘
                            │
 ┌──────────────────────────▼──────────────────────────────────────┐
-│ 1. Data Ingestion Layer                                        │
-│   • Load velocity snapshots (.npy, PyFR, or analytical)       │
-│   • Parse config.yml for simulation parameters                │
-│   • Resolve project paths and cache directories               │
+│ 1. Data Ingestion Layer                                         │
+│   • Load velocity snapshots (.npy, PyFR, or analytical)         │
+│   • Parse config.yml for simulation parameters                  │
+│   • Resolve project paths and cache directories                 │
 └──────────────────────────┬──────────────────────────────────────┘
                            │
 ┌──────────────────────────▼──────────────────────────────────────┐
-│ 2. Particle Trajectory Simulation                              │
-│   • Integrate ODE: dx/dt = V(x, t)  [Langevin + diffusion]   │
-│   • Solvers: Euler, RK4, or scipy adaptive                    │
-│   • Output: TrajectoryResult (positions, velocities, times)   │
+│ 2. Particle Trajectory Simulation                               │
+│   • Integrate ODE: dx/dt = V(x, t)  [Langevin + diffusion]      │
+│   • Solvers: Euler, RK4, or scipy adaptive                      │
+│   • Output: TrajectoryResult (positions, velocities, times)     │
 └──────────────────────────┬──────────────────────────────────────┘
                            │
 ┌──────────────────────────▼──────────────────────────────────────┐
-│ 3. Dataset Preparation                                         │
-│   • Create PyTorch datasets with sliding windows              │
-│   • Normalize and batch trajectories                          │
-│   • Prepare DataLoader for training                           │
+│ 3. Dataset Preparation                                          │
+│   • Create PyTorch datasets with sliding windows                │
+│   • Normalize and batch trajectories                            │
+│   • Prepare DataLoader for training                             │
 └──────────────────────────┬──────────────────────────────────────┘
                            │
 ┌──────────────────────────▼──────────────────────────────────────┐
-│ 4. Neural ODE Model Training                                   │
-│   • CNF (Continuous Normalizing Flows) or                    │
-│   • Variational SDE (probabilistic dynamics)                 │
-│   • Adjoint method for gradient computation                  │
-│   • Checkpoint best model and save metrics                   │
+│ 4. Neural ODE Model Training                                    │
+│   • CNF (Continuous Normalizing Flows) or                       │
+│   • Variational SDE (probabilistic dynamics)                    │
+│   • Adjoint method for gradient computation                     │
+│   • Checkpoint best model and save metrics                      │
 └──────────────────────────┬──────────────────────────────────────┘
                            │
 ┌──────────────────────────▼──────────────────────────────────────┐
-│ 5. Inference & Visualization                                   │
-│   • Generate trajectory animations (GIF/MP4)                 │
-│   • Interactive 3D viewer with Taichi                        │
-│   • Plot loss curves and trajectory metrics                  │
-│   • Export results for downstream analysis                   │
-└────────────────────────────────────────────────────────────────┘
+│ 5. Inference & Visualization                                    │
+│   • Generate trajectory animations (GIF/MP4)                    │
+│   • Interactive 3D viewer with Taichi                           │
+│   • Plot loss curves and trajectory metrics                     │
+│   • Export results for downstream analysis                      │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ### Data Flow Diagram
