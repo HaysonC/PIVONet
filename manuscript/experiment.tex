@@ -1,0 +1,97 @@
+\section{Experiment Setup}
+\subsection{Hypothesis}
+The experiment is designed to test the hypothesis that:
+\begin{enumerate}
+    \item Using neuro ODE-based generative models can effectively capture complex fluid dynamics.
+    \item Integrating VSDE controllers with CNF backbones enhances the model's ability to represent stochastic behaviors in fluid flows.
+    \item The proposed framework can generalize across different flow regimes, including inviscid, viscous, and incompressible scenarios.
+    \item The proposed framewrok is numerically stable and can generalize with differnt integrators.
+\end{enumerate}
+
+\subsection{Data Simulation}\label{sec:xsimulation}
+
+To generate high-fidelity, time-resolved flow fields for training and evaluation of continuous normalizing flow (CNF) and stochastic differential equation (SDE) models, we employed the open-source \texttt{PyFR} framework as the numerical simulation engine~\cite{witherden2025pyfr}. \texttt{PyFR} is a Python-based computational fluid dynamics (CFD) platform that implements high-order accurate spatial discretization using the flux reconstruction approach and is capable of solving the compressible Navier–Stokes equations on unstructured meshes across heterogeneous hardware architectures.
+
+The specifications for the \texttt{PyFR} orchestrations is in Appendix \ref{apx:pyfr}
+
+The governing conservation laws for compressible fluid flow are expressed as:
+
+\begin{equation}\label{eq:Navier-Stokes}
+\frac{\partial \mathbf{U}}{\partial t}
++ \nabla \cdot \mathbf{F}(\mathbf{U})
+= \nabla \cdot \mathbf{F}_v(\mathbf{U}, \nabla \mathbf{U}),
+\end{equation}
+
+where \(\mathbf{U}\) denotes the vector of conserved variables, \(\mathbf{F}\) and \(\mathbf{F}_v\) represent inviscid and viscous fluxes respectively, and the right-hand side encapsulates viscous transport contributions.
+
+Spatial discretization in \texttt{PyFR} employs a high-order flux reconstruction scheme that replaces spatial derivatives with discrete algebraic operators evaluated at solution and flux points defined on the computational mesh. Following discretization of the spatial operators, the partial differential equation (PDE) system is reduced to a large system of ordinary differential equations (ODEs):
+
+\begin{equation}\label{eq:Simplified}
+\frac{d\mathbf{u}(t)}{dt} = \mathbf{f}(\mathbf{u}(t)),
+\end{equation}
+
+where \(\mathbf{u}(t)\) is the vector of all discrete flow variables comprising density, momentum, and energy at each node, and \(\mathbf{f}\) encapsulates the semi-discrete flux and source approximations. \texttt{PyFR} advances this system in time using explicit time integration schemes suitable for high-order methods.
+
+Because the resulting solutions still encode conserved quantities, they become the reference for our physics-informed loss. We later compute a transformed temperature field and velocity signal from the discrete states and penalize the residual of the thermal energy equation
+\begin{equation}
+\rho c_p\left(\frac{\partial T}{\partial t} + \mathbf{u} \cdot \nabla T\right) = k \nabla^2 T + \Phi,
+\end{equation}
+which balances temporal and advective heating against conduction and viscous dissipation. This augments the variational autoencoder with a PDE-based constraint that is consistent with the compressible simulation data.
+
+\subsection{Flow Cases}
+We evaluate our framework across three canonical fluid dynamics scenarios that exhibit diverse flow behaviors and complexities:
+\begin{itemize}
+    \item \textbf{2D Euler Vortex:} This case involves simulating a two-dimensional vortex in an inviscid fluid governed by the Euler equations. The vortex dynamics test the model's ability to capture rotational flow features and conserve vorticity over time.
+    \item \textbf{Viscous Shock Tube:} This scenario simulates the evolution of shock waves and contact discontinuities in a viscous medium. The shock tube problem challenges the model to accurately represent sharp gradients and dissipative effects inherent in viscous flows.
+    \item \textbf{Incompressible Cylinder Flow:} This case examines the flow around a circular cylinder in an incompressible fluid. The cylinder flow problem assesses the model's capability to capture boundary layer development, vortex shedding, and wake dynamics.
+\end{itemize}
+
+The specific configurations for each flow case, including domain size, mesh resolution, initial and boundary conditions, and physical parameters (e.g., Reynolds number, Mach number), are detailed in the code repository accompanying this manuscript. In addtional below is a brief overview of the governing equations and numerical setups for each scenario.
+
+\paragraph{2D Euler Vortex}
+The 2D Euler vortex is governed by the inviscid Euler equations, which describe the conservation of mass, momentum, and energy in a compressible fluid without viscosity. The governing equations are expressed in conservation form as:
+\begin{equation}
+\frac{\partial \mathbf{U}}{\partial t} + \nabla \cdot \mathbf{F}(\mathbf{U}) = 0,
+\end{equation}
+where \(\mathbf{U}\) is the vector of conserved variables, and \(\mathbf{F}(\mathbf{U})\) represents the flux tensor. The initial condition consists of a Gaussian vortex superimposed on a uniform flow field. The computational domain is discretized using a structured mesh with periodic boundary conditions.
+
+\paragraph{Viscous Shock Tube}
+The viscous shock tube problem is governed by the compressible Navier–Stokes equations, which account for viscous effects in addition to the conservation of mass, momentum, and energy. The governing equations are given by:
+\begin{equation}
+\frac{\partial \mathbf{U}}{\partial t} + \nabla \cdot \mathbf{F}(\mathbf{U}) = \nabla \cdot \mathbf{F}_v(\mathbf{U}, \nabla \mathbf{U}),
+\end{equation}
+where \(\mathbf{F}_v(\mathbf{U}, \nabla \mathbf{U})\) represents the viscous flux tensor. The initial condition consists of a high-pressure region adjacent to a low-pressure region, separated by a diaphragm. The computational domain is discretized using an unstructured mesh with reflective boundary conditions at the tube walls.
+
+\paragraph{Incompressible Cylinder Flow}
+The incompressible cylinder flow is governed by the incompressible Navier–Stokes equations, which describe the conservation of mass and momentum in an incompressible fluid. The governing equations are expressed as:
+\begin{equation}
+\nabla \cdot \mathbf{u} = 0,
+\end{equation}
+\begin{equation}
+\frac{\partial \mathbf{u}}{\partial t} + \mathbf{u} \cdot \nabla \mathbf{u} = -\nabla p + \nu \nabla^2 \mathbf{u},
+\end{equation}
+where \(\mathbf{u}\) is the velocity field, \(p\) is the pressure field, and \(\nu\) is the kinematic viscosity. The initial condition consists of a uniform flow field impinging on a circular cylinder. The computational domain is discretized using an unstructured mesh with no-slip boundary conditions on the cylinder surface and far-field conditions at the domain boundaries.
+
+
+\subsection{Experiment Workflow}
+The empirical pipeline described below is executed across several flow cases (2D Euler vortex, viscous shock tube, and incompressible cylinder)  whose configurations are captured in the code base. Appendix \ref{apx:implementation} details the software implementation, which includes clearly defined wroflow modules that matches the steps below:
+
+\begin{enumerate}
+	\item \textbf{Trajectory simulation:} 4096 particles are marched for 240 steps with varying \(\Delta t\) to produce bundles of trajectories, velocity snapshots, and mesh coordinates that subsequent modules reuse.
+	\item \textbf{CNF backbone training:} The CNF drift network trains on the trajectory endpoints in minibatches of 512 for eight epochs, using a 0.002 learning rate, hidden dimension 64, depth 3, and context dimension 3;
+	\item \textbf{VSDE controller training:} With the CNF frozen, the variational posterior drift net and diffusion scale optimize over 50 epochs with batch size 2048, learning rate 0.01, 64 particles, and 120 integration steps; control cost, kinetic-energy, and PDE penalties regularize the latent paths while the diffusion remains learnable.
+	\item \textbf{Inference diagnostics:} Ensembles of 64 particles over 120 steps are decoded through the CNF+VSDE pair to produce overlay PNGs (VSDE vs. GT, CNF vs. GT, mixed overlays) and velocity-phase plots. We save the experimental artifacts.
+	\item \textbf{Velocity visualization:} A 50k-vector sample renders the velocity phase-space PNG, and a quiver animation (vector stride 3, 12 fps) animates temporal evolution for QA.
+\end{enumerate}
+
+\subsection{Training and Experimental Metrics}\label{sec:training_metrics}
+Training runs used Apple M1 silicon (MPS backend) so the CNF and VSDE modules finish within roughly 15 minutes each on the cached trajectory bundles; we warm up the learning rate for 1k steps and rely on AdamW with cosine annealing to stabilize convergence. The CFD trajectories are split into training and validation bundles that emphasize the vortex phase so the learned dynamics focus on the advection-dominated regime.
+
+Hyperparameter values are summarized in Table~\ref{tab:hyperparams} (Appendix~\ref{apx:hyperparams}): the CNF uses minibatches of 512 for eight epochs with a 0.002 base learning rate, while the VSDE controller executes 50 epochs with batch size 2048, learning rate 0.01, 64 posterior particles, 120 integration steps, and physics penalties on control cost, kinetic energy, and the PDE residual.
+
+\subsection{Evaluation Sets}
+\subsubsection{VSDE vs. CNF-only Dynamics}
+We measure reconstruction accuracy on held-out bundles for each flow case and report the VSDE-augmented latent paths alongside the baseline CNF-only ODE. Across the Euler vortex, viscous shock tube, and incompressible cylinder experiments, the VSDE consistently improves RMSE and likelihood by steering trajectories back toward the learned manifold whenever the CNF starts to deviate.
+\subsubsection{Integrator Comparison}
+Inference stability is confirmed across Euler, Heun, RK4, and Dormand–Prince integrators for each flow, using overlay plots and energy statistics to quantify fidelity. After tuning the VSDE diffusion scale, all integrators reach similar accuracy, which confirms that the learned control dominates ensemble behavior while the choice of deterministic integrator only marginally affects fidelity in these flow regimes.
+

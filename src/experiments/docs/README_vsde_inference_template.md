@@ -14,6 +14,7 @@ This README describes the files emitted by the VSDE inference experiment step.
 - `bundles/vsde_generated.npz` – Serialized bundle containing the VSDE-generated trajectories used for `vsde_generated.png`.
 - `vsde_vs_cnf_metrics.json` – Global and per-region summary statistics (MAE/RMSE/median) for VSDE and CNF predictions.
 - `vsde_vs_cnf_plot.json` – JSON payload with the precise values that feed the bar chart so plots can be regenerated offline.
+- `error_distributions.npz` – MAE arrays for VSDE (and CNF when available) so downstream scripts can recreate histograms and tail statistics.
 
 > Overlay PNGs are written to the overlay directory configured for the experiment step (defaults to the `plots/` subfolder next to other artifacts).
 Each README copied into an artifact directory will append a run-specific summary (timestamp, trajectory counts, and global metrics).

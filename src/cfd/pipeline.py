@@ -41,7 +41,9 @@ class CFDPipeline:
         simulation_result = run_pyfr_case(
             case_path,
             backend=self.config.pyfr_backend,
-            vtus_dir=self._resolve_data_dir(self.config.pyfr_output_subdir, create=True),
+            vtus_dir=self._resolve_data_dir(
+                self.config.pyfr_output_subdir, create=True
+            ),
             density_dir=self.config.density_dir,
             velocity_dir=self.config.velocity_dir,
             points_dir=self._resolve_data_dir("cfd/npy/points", create=True),
@@ -50,7 +52,9 @@ class CFDPipeline:
         trajectory_export = self._export_trajectories(
             simulation_result,
             num_particles=particles or self.config.trajectory_particles,
-            max_steps=max_steps if max_steps is not None else self.config.trajectory_steps,
+            max_steps=max_steps
+            if max_steps is not None
+            else self.config.trajectory_steps,
             dt=dt or self.config.trajectory_dt,
         )
 
@@ -99,13 +103,19 @@ class CFDPipeline:
             diffusion_coefficient=self.config.diffusion_constant,
             dt=dt,
         )
-        trajectories = simulator.simulate(num_particles=num_particles, max_steps=max_steps)
+        trajectories = simulator.simulate(
+            num_particles=num_particles, max_steps=max_steps
+        )
 
         export_dir = self.config.trajectory_dir
         export_dir.mkdir(parents=True, exist_ok=True)
         stamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
         bundle_path = export_dir / f"trajectories_n{num_particles}_{stamp}.npz"
-        np.savez(bundle_path, history=trajectories.history, timesteps=np.asarray(trajectories.timesteps))
+        np.savez(
+            bundle_path,
+            history=trajectories.history,
+            timesteps=np.asarray(trajectories.timesteps),
+        )
 
         return TrajectoryExport(
             path=bundle_path,

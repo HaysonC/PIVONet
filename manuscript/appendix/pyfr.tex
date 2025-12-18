@@ -1,0 +1,8 @@
+
+\section{PyFR Orchestration} \label{apx:pyfr}
+
+Simulations were orchestrated within a Jupyter Notebook environment to facilitate reproducible execution, automated workflow control, GPU acceleration via CUDA, and seamless integration with downstream post-processing and dataset management procedures.
+
+The output of the simulation pipeline is a set of ground-truth physical trajectories representing the evolution of flow variables over time. Each simulation is initialized from a mesh file (\texttt{.msh}) defining the domain discretization and a solver configuration file (\texttt{.ini}) specifying physical parameters and temporal integration settings; these inputs are converted into \texttt{PyFR}'s internal formats prior to execution. Post-processing converts the solver state outputs into structured numerical arrays that preserve spatial and temporal coherency, yielding discrete samples of an underlying continuous-time dynamical system governed by Eq.~\eqref{eq:Navier-Stokes}. These datasets provide the reference trajectories used to train and validate the learned dynamical models~\cite{witherden2025pyfr}.
+
+To support reproducibility, all data, simulation scripts, and configuration files are provided alongside the accompanying GitHub repository.

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib import animation
@@ -20,7 +21,9 @@ from ..utils.paths import resolve_data_path
 from ..utils.trajectory_io import load_trajectory_bundle
 
 
-def _ellipse_from_gaussian(mean: np.ndarray, cov: np.ndarray, n_std: float = 2.0, **kwargs) -> Ellipse:
+def _ellipse_from_gaussian(
+    mean: np.ndarray, cov: np.ndarray, n_std: float = 2.0, **kwargs
+) -> Ellipse:
     vals, vecs = np.linalg.eigh(cov)
     order = vals.argsort()[::-1]
     vals, vecs = vals[order], vecs[:, order]
@@ -62,7 +65,9 @@ def _plot_flow_overlay(
         ax.quiver(X, Y, U, V, color="k", alpha=0.8)
 
 
-def _draw_varying_channel(ax: Axes, flow_fn: Any, xlim: tuple[float, float], steps: int = 200) -> None:
+def _draw_varying_channel(
+    ax: Axes, flow_fn: Any, xlim: tuple[float, float], steps: int = 200
+) -> None:
     if flow_fn is None or not hasattr(flow_fn, "Hx"):
         return
     Hx = getattr(flow_fn, "Hx")
@@ -73,7 +78,9 @@ def _draw_varying_channel(ax: Axes, flow_fn: Any, xlim: tuple[float, float], ste
     ax.plot(xs, bot, color="k", linestyle="--", linewidth=1.2, alpha=0.5)
 
 
-def animation_to_html(anim: animation.FuncAnimation, embed_limit_mb: float | None = None) -> str:
+def animation_to_html(
+    anim: animation.FuncAnimation, embed_limit_mb: float | None = None
+) -> str:
     if embed_limit_mb is not None:
         try:
             matplotlib.rcParams["animation.embed_limit"] = float(embed_limit_mb)
@@ -91,7 +98,9 @@ class ComparisonArtifact:
 class CFDVisualizer:
     """Compare trajectory exports and produce diagnostics/animations."""
 
-    def __init__(self, max_particles: int = 200, figsize: tuple[float, float] = (10, 4)) -> None:
+    def __init__(
+        self, max_particles: int = 200, figsize: tuple[float, float] = (10, 4)
+    ) -> None:
         self.max_particles = max_particles
         self.figsize = figsize
 
@@ -118,8 +127,28 @@ class CFDVisualizer:
         ylim_a = (float(history_a[:, :, 1].min()), float(history_a[:, :, 1].max()))
         xlim_b = (float(history_b[:, :, 0].min()), float(history_b[:, :, 0].max()))
         ylim_b = (float(history_b[:, :, 1].min()), float(history_b[:, :, 1].max()))
-        self._draw_history(axes_list[0], history_a, "reference", init_mean, init_cov, flow_fn, overlay_mode, xlim_a, ylim_a)
-        self._draw_history(axes_list[1], history_b, "comparison", init_mean, init_cov, flow_fn, overlay_mode, xlim_b, ylim_b)
+        self._draw_history(
+            axes_list[0],
+            history_a,
+            "reference",
+            init_mean,
+            init_cov,
+            flow_fn,
+            overlay_mode,
+            xlim_a,
+            ylim_a,
+        )
+        self._draw_history(
+            axes_list[1],
+            history_b,
+            "comparison",
+            init_mean,
+            init_cov,
+            flow_fn,
+            overlay_mode,
+            xlim_b,
+            ylim_b,
+        )
 
         for ax in axes_list:
             ax.set_aspect("equal")
@@ -132,7 +161,9 @@ class CFDVisualizer:
         if not show:
             plt.close(fig)
 
-        metrics = compare_final_positions(bundle_a.final_positions, bundle_b.final_positions)
+        metrics = compare_final_positions(
+            bundle_a.final_positions, bundle_b.final_positions
+        )
         return ComparisonArtifact(plot=PlotArtifact(path=path), metrics=metrics)
 
     def _draw_history(
@@ -152,10 +183,21 @@ class CFDVisualizer:
         for idx in indices:
             ax.plot(history[:, idx, 0], history[:, idx, 1], alpha=0.6)
         if init_mean is not None and init_cov is not None:
-            ell = _ellipse_from_gaussian(np.asarray(init_mean).reshape(2), np.asarray(init_cov).reshape(2, 2), edgecolor='red', linewidth=1.5)
+            ell = _ellipse_from_gaussian(
+                np.asarray(init_mean).reshape(2),
+                np.asarray(init_cov).reshape(2, 2),
+                edgecolor="red",
+                linewidth=1.5,
+            )
             ax.add_patch(ell)
-            ax.scatter([init_mean[0]], [init_mean[1]], color='red', s=20, label='Initial mean')
-        if flow_fn is not None and hasattr(flow_fn, "boundary_type") and getattr(flow_fn, "boundary_type") == "varying-channel":
+            ax.scatter(
+                [init_mean[0]], [init_mean[1]], color="red", s=20, label="Initial mean"
+            )
+        if (
+            flow_fn is not None
+            and hasattr(flow_fn, "boundary_type")
+            and getattr(flow_fn, "boundary_type") == "varying-channel"
+        ):
             _draw_varying_channel(ax, flow_fn, xlim)
         ax.set_title(label)
         ax.set_xlabel("x")
@@ -172,14 +214,18 @@ class CFDVisualizer:
         fig, axes = plt.subplots(1, 2, figsize=self.figsize, dpi=140)
         axes_list = axes if isinstance(axes, (list, tuple)) else [axes]
         for ax in axes_list:
-            ax.set_facecolor('white')
-        axes_list[0].hist2d(true_history[:, -1, 0], true_history[:, -1, 1], bins=bins, cmap='viridis')
-        axes_list[0].set_title('True final positions')
-        axes_list[1].hist2d(pred_history[:, -1, 0], pred_history[:, -1, 1], bins=bins, cmap='viridis')
-        axes_list[1].set_title('Predicted final positions')
+            ax.set_facecolor("white")
+        axes_list[0].hist2d(
+            true_history[:, -1, 0], true_history[:, -1, 1], bins=bins, cmap="viridis"
+        )
+        axes_list[0].set_title("True final positions")
+        axes_list[1].hist2d(
+            pred_history[:, -1, 0], pred_history[:, -1, 1], bins=bins, cmap="viridis"
+        )
+        axes_list[1].set_title("Predicted final positions")
         for ax in axes_list:
-            ax.set_xlabel('x')
-            ax.set_ylabel('y')
+            ax.set_xlabel("x")
+            ax.set_ylabel("y")
         fig.tight_layout()
         path = self._resolve_output_path(output_path)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -204,7 +250,7 @@ class CFDVisualizer:
         embed_limit_mb: float | None = None,
     ) -> animation.FuncAnimation:
         fig, ax = plt.subplots(figsize=self.figsize, dpi=140)
-        ax.set_facecolor('white')
+        ax.set_facecolor("white")
         candidates = true_history.shape[0]
         if pred_history is not None:
             candidates = min(candidates, pred_history.shape[0])
@@ -217,28 +263,59 @@ class CFDVisualizer:
         xlim = (float(true_history[:, :, 0].min()), float(true_history[:, :, 0].max()))
         ylim = (float(true_history[:, :, 1].min()), float(true_history[:, :, 1].max()))
         if pred_history is not None:
-            xlim = (min(xlim[0], float(pred_history[:, :, 0].min())), max(xlim[1], float(pred_history[:, :, 0].max())))
-            ylim = (min(ylim[0], float(pred_history[:, :, 1].min())), max(ylim[1], float(pred_history[:, :, 1].max())))
+            xlim = (
+                min(xlim[0], float(pred_history[:, :, 0].min())),
+                max(xlim[1], float(pred_history[:, :, 0].max())),
+            )
+            ylim = (
+                min(ylim[0], float(pred_history[:, :, 1].min())),
+                max(ylim[1], float(pred_history[:, :, 1].max())),
+            )
 
         _plot_flow_overlay(ax, flow_fn, xlim, ylim)
         if init_mean is not None and init_cov is not None:
-            ell = _ellipse_from_gaussian(np.asarray(init_mean).reshape(2), np.asarray(init_cov).reshape(2, 2), edgecolor='red', linewidth=1.5)
+            ell = _ellipse_from_gaussian(
+                np.asarray(init_mean).reshape(2),
+                np.asarray(init_cov).reshape(2, 2),
+                edgecolor="red",
+                linewidth=1.5,
+            )
             ax.add_patch(ell)
-            ax.scatter([init_mean[0]], [init_mean[1]], color='red', s=20)
+            ax.scatter([init_mean[0]], [init_mean[1]], color="red", s=20)
 
-        lines_true = [ax.plot([], [], color='tab:blue', alpha=0.85, linewidth=1.2, label=('True' if k == 0 else '_nolegend_'))[0] for k in range(len(idx))]
+        lines_true = [
+            ax.plot(
+                [],
+                [],
+                color="tab:blue",
+                alpha=0.85,
+                linewidth=1.2,
+                label=("True" if k == 0 else "_nolegend_"),
+            )[0]
+            for k in range(len(idx))
+        ]
         lines_pred = None
         if pred_history is not None:
-            lines_pred = [ax.plot([], [], color='tab:orange', alpha=0.85, linewidth=1.2, label=('Pred' if k == 0 else '_nolegend_'))[0] for k in range(len(idx))]
+            lines_pred = [
+                ax.plot(
+                    [],
+                    [],
+                    color="tab:orange",
+                    alpha=0.85,
+                    linewidth=1.2,
+                    label=("Pred" if k == 0 else "_nolegend_"),
+                )[0]
+                for k in range(len(idx))
+            ]
 
         if H is not None:
-            ax.axhline(H, color='k', linestyle='--', linewidth=1)
-            ax.axhline(-H, color='k', linestyle='--', linewidth=1)
+            ax.axhline(H, color="k", linestyle="--", linewidth=1)
+            ax.axhline(-H, color="k", linestyle="--", linewidth=1)
         ax.set_xlim(xlim)
         ax.set_ylim(ylim)
-        ax.set_xlabel('x (position)')
-        ax.set_ylabel('y (position)')
-        ax.set_title('Animated trajectories (true vs predicted)')
+        ax.set_xlabel("x (position)")
+        ax.set_ylabel("y (position)")
+        ax.set_title("Animated trajectories (true vs predicted)")
 
         def init():
             for line in lines_true:
@@ -255,19 +332,21 @@ class CFDVisualizer:
             start_pred = 0 if tail is None else max(0, frame_pred - tail)
             for k, idx_i in enumerate(idx):
                 lines_true[k].set_data(
-                    true_history[idx_i, start_true:frame_true + 1, 0],
-                    true_history[idx_i, start_true:frame_true + 1, 1],
+                    true_history[idx_i, start_true : frame_true + 1, 0],
+                    true_history[idx_i, start_true : frame_true + 1, 1],
                 )
                 if lines_pred is not None and pred_history is not None:
                     lines_pred[k].set_data(
-                        pred_history[idx_i, start_pred:frame_pred + 1, 0],
-                        pred_history[idx_i, start_pred:frame_pred + 1, 1],
+                        pred_history[idx_i, start_pred : frame_pred + 1, 0],
+                        pred_history[idx_i, start_pred : frame_pred + 1, 1],
                     )
             return (*lines_true, *(lines_pred or []))
 
         stride = frame_stride or max(1, int(max(1, T // max_frames)))
         frames = list(range(0, T, stride))
-        anim = animation.FuncAnimation(fig, update, frames=frames, init_func=init, interval=interval, blit=True)
+        anim = animation.FuncAnimation(
+            fig, update, frames=frames, init_func=init, interval=interval, blit=True
+        )
         if not embed_limit_mb:
             plt.close(fig)
         return anim

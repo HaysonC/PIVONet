@@ -5,7 +5,14 @@ import torch.nn as nn
 
 
 class MLP(nn.Module):
-    def __init__(self, in_dim: int, out_dim: int, hidden_dim: int = 64, depth: int = 3, dropout_p: float = 0.0):
+    def __init__(
+        self,
+        in_dim: int,
+        out_dim: int,
+        hidden_dim: int = 64,
+        depth: int = 3,
+        dropout_p: float = 0.0,
+    ):
         super().__init__()
         layers = []
         d = in_dim

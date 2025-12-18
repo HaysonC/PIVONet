@@ -23,7 +23,9 @@ def _resolve_output(path_like: str | Path) -> Path:
     return path
 
 
-def plot_loss_curve(losses: Sequence[float], output_path: str | Path, *, title: str | None = None) -> PlotArtifact:
+def plot_loss_curve(
+    losses: Sequence[float], output_path: str | Path, *, title: str | None = None
+) -> PlotArtifact:
     if not losses:
         raise ValueError("Cannot plot an empty loss history.")
     target = _resolve_output(output_path)
@@ -49,7 +51,11 @@ def plot_metric_grid(
 ) -> PlotArtifact:
     if not metric_history:
         raise ValueError("Metric history is empty; nothing to plot.")
-    keys = list(metric_keys) if metric_keys is not None else _infer_metric_keys(metric_history)
+    keys = (
+        list(metric_keys)
+        if metric_keys is not None
+        else _infer_metric_keys(metric_history)
+    )
     if not keys:
         raise ValueError("No metric keys were provided or inferred from history.")
     target = _resolve_output(output_path)

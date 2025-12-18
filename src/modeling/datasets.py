@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Sequence
+from typing import Sequence
 
 import numpy as np
 import torch
@@ -40,7 +40,9 @@ class CFDEndpointDataset(Dataset):
             with np.load(path, allow_pickle=False) as data:
                 history = data["history"]
             num_particles = history.shape[1]
-            self.records.extend(_ParticleRecord(bundle_path=path, index=i) for i in range(num_particles))
+            self.records.extend(
+                _ParticleRecord(bundle_path=path, index=i) for i in range(num_particles)
+            )
         self._cache: dict[Path, dict[str, np.ndarray]] = {}
 
     def __len__(self) -> int:  # pragma: no cover - simple container
@@ -60,7 +62,11 @@ class CFDEndpointDataset(Dataset):
             )
         x0 = torch.from_numpy(traj[0]).float()
         x_final = torch.from_numpy(traj[-1]).float()
-        duration = float(timesteps[-1] - timesteps[0]) if len(timesteps) > 1 else float(len(traj) - 1)
+        duration = (
+            float(timesteps[-1] - timesteps[0])
+            if len(timesteps) > 1
+            else float(len(traj) - 1)
+        )
         theta = torch.tensor([duration], dtype=torch.float32)
         context = torch.cat([x0, theta], dim=0)
         return x_final, x0, theta, context
@@ -87,7 +93,9 @@ class CFDTrajectorySequenceDataset(Dataset):
             with np.load(path, allow_pickle=False) as data:
                 history = data["history"]
             num_particles = history.shape[1]
-            self.records.extend(_ParticleRecord(bundle_path=path, index=i) for i in range(num_particles))
+            self.records.extend(
+                _ParticleRecord(bundle_path=path, index=i) for i in range(num_particles)
+            )
         self._cache: dict[Path, dict[str, np.ndarray]] = {}
 
     def __len__(self) -> int:  # pragma: no cover - simple container
@@ -106,7 +114,9 @@ class CFDTrajectorySequenceDataset(Dataset):
             )
         if len(timesteps) == traj.shape[0]:
             times = torch.from_numpy(timesteps).float()
-            duration = float(timesteps[-1] - timesteps[0]) if len(timesteps) > 1 else 1.0
+            duration = (
+                float(timesteps[-1] - timesteps[0]) if len(timesteps) > 1 else 1.0
+            )
         else:
             duration = float(traj.shape[0] - 1)
             times = torch.linspace(0.0, duration, steps=traj.shape[0])

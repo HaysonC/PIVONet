@@ -1,0 +1,59 @@
+\section{Results}
+
+This section presents experimental results corresponding to the hypotheses outlined. 
+As well, MAE is chosen as the primary metric for evaluating model performance across various scenarios. This is becasue:
+\begin{enumerate}
+\item \textbf{Interpretability}: MAE provides a straightforward measure of average error in the same units as the predicted variable, making it easy to interpret the model's performance in practical terms.
+\item \textbf{Linearity}: MAE treats all errors equally, providing a linear measure of average error without disproportionately penalizing larger errors, which is suitable for many fluid dynamics applications where consistent performance is desired.
+\item \textbf{Robustness to Outliers}: While MAE is sensitive to outliers, it is less so than metrics like Mean Squared Error (MSE). This balance makes MAE a good choice for fluid dynamics data, which may contain occasional anomalies due to turbulence or measurement noise.
+\end{enumerate}
+\subsection{Expressiveness of ODE Backbones for Fluid Dynamics}
+We first evaluate the performance of different ODE-based backbone models in capturing fluidic dynamics. Overall, the ODE-only approach is able to learn the dominant, mean flow behavior and produces smooth, physically consistent trajectories that align with the large-scale structure of the flow. In particular, the homogeneous CNF successfully converges to a stable solution that reflects the primary deterministic dynamics of the incompressible cylinder flow.
+
+However, this same determinism becomes a limitation when modeling stochastic fluid behavior. Although the model implicitly learns a probability distribution over trajectories, the absence of latent variables restricts its expressive capacity. As a result, the learned dynamics collapse toward a single dominant mode, making the model overly conservative and preventing it from capturing the full range of stochastic variations present in the system. This leads to an underrepresentation of flow variability and fine-scale randomness observed in the ground truth data. The inference results of the ODE-only model are shown in Figure~\ref{fig:inc-cylinder-ode}.
+
+\begin{figure}[h!]
+\centering
+\includegraphics[width=1\linewidth]{figures/results/inc-cylinder/ODE_inference.png}
+\caption{Inference results of the ODE-only CNF model on the incompressible cylinder flow. Predicted trajectories are overlaid on the ground truth flow realizations. While the model accurately captures the overall mean flow structure and produces smooth, stable trajectories, the predictions collapse toward a deterministic solution. This behavior highlights the model’s inability to represent stochastic variations and multi-modal flow behavior, resulting in limited diversity compared to the ground truth dynamics.}
+\label{fig:inc-cylinder-ode}
+\end{figure}
+
+\subsection{Comparison of CNF with and without VSDE forcing}
+By incorporating a learned stochastic inhomogeneous forcing term through the the entire PIVONet framework, we observe a significant enhancement in the model's ability to capture the inherent variability and randomness of fluid dynamics. The VSDE component introduces latent variables that enable the model to represent a richer distribution over possible flow trajectories, allowing it to account for fine-scale fluctuations and multi-modal behaviors that were previously unrepresented in the ODE-only approach. This results in a more faithful reproduction of the stochastic characteristics observed in the ground truth data, as the
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=1\linewidth]{figures/results/shock-tube/timestep_mae.png}
+    \caption{Caption}
+    \label{fig:placeholder}
+\end{figure}
+
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=1\linewidth]{figures/results/inc-cylinder/ODE_inference.png}
+    \caption{Caption}
+    \label{fig:placeholder}
+\end{figure}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.5\linewidth]{figures/results/shock-tube/trajectory_overlay.png}
+    \caption{Caption}
+    \label{fig:placeholder}
+\end{figure}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=1\linewidth]{figures/results/shock-tube/vsde_vs_cnf_difference.png}
+    \caption{Like different regimes}
+    \label{fig:placeholder}
+\end{figure}
+
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=1\linewidth]{figures/results/integrator/comparison_mae.png}
+    \caption{Like integrator}
+    \label{fig:placeholder}
+\end{figure}

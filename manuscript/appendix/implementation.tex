@@ -1,0 +1,30 @@
+\section{Implementation and Reproducibility} \label{apx:implementation}
+All code lives in \texttt{\url{github.com/haysonc/pivonet}}. Clone the repository, install dependencies, and run the VSDE model with the following steps:
+\begin{enumerate}
+\item Set up the virtual environment and install the requirements:
+\begin{verbatim}
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+\end{verbatim}
+\item Use the \texttt{pivo} CLI to orchestrate training/inference or call the flow module:\\
+\begin{verbatim}
+pivo
+\end{verbatim}
+\end{enumerate}
+Dataset from \texttt{PyFR} is uploaded on Google Drive: \texttt{\url{https://drive.google.com/file/d/1MWayzNu9oW745n9ZPRmS7aWnw8wthX8k/view?usp=drive_link}}. You can download and extract it into the \texttt{data/} folder in the repository root.
+
+A sample repository stucture is as follows:
+\begin{verbatim}
+pivonet/
+|-- data/
+|   |-- 2d-euler-vortex/
+|   `-- ...
+|-- src/
+|   |-- models/
+|   |-- utils/
+|   `-- ...
+`-- ...
+\end{verbatim}
+For more detailed instructions, refer to the \texttt{README.md} in the repository root.
+The code style is enforced with \texttt{ruff} and is configured via \texttt{pyproject.toml} ; all configuration values follow YAML-like semantics with leading keys for clarity, so keep any new scripts aligned with those defaults.

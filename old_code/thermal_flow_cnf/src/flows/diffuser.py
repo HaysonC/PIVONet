@@ -2,7 +2,9 @@ import numpy as np
 from typing import Callable
 
 
-def diffuser_flow(Umax_in: float, H_in: float, H_out: float, L: float = 1.0) -> Callable[[np.ndarray], np.ndarray]:
+def diffuser_flow(
+    Umax_in: float, H_in: float, H_out: float, L: float = 1.0
+) -> Callable[[np.ndarray], np.ndarray]:
     """Planar diffuser with linearly expanding half-height H(x) from H_in to H_out over length L.
 
     Assumptions:

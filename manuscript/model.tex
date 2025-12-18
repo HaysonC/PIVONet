@@ -1,0 +1,109 @@
+\section{Model}
+\begin{figure*}[h!]
+    \centering
+    \includegraphics[width=1\linewidth]{figures/architecture.png}
+    \caption{The VSDE framework couples a frozen CNF backbone with learned posterior controls and physics-informed losses.}
+    \label{fig:architecture}
+\end{figure*}
+
+\subsection{Neural Differential Equation Backbone}
+We train a continuous normalizing flow (CNF) to inherit the backbone dynamics of the flow \cite{Chen2018,Grathwohl2019}. The CNF delivers an expressive drift \(f_\theta(z)\) that encodes the physics of the training dataset, while the VSDE extends it with stochastic diffusion and posterior controls to match observed trajectories. We treat the CNF as a frozen module and learn only the additional control signal \(u(z, t)\) and diffusion coefficient \(g\), which keeps the base physics intact while providing flexibility during inference.
+Adding the VSDE path is therefore equivalent to augmenting the modeling ODE with a nonhomogeneous stochastic forcing term, letting the learned controls and diffusion absorb dataset-specific deviations without corrupting the pretrained drift.
+\begin{equation}
+\mathrm{d}z = f_\theta \,\mathrm{d}t + g_\phi\,\mathrm{d}W_t 
+\end{equation}
+Here the control \(u(z, t)\) and diffusion coefficient \(g\) act as the learned forcing, while \(\mathrm{d}W_t\) denotes the Brownian increment that encodes stochasticity.
+
+By adding the varieational component, our model tend to explore different pathways when reconstructing the same input; This results in a higher stablity as the model is more likely to stay on the learned manifold, as the varieatioanl component can help nudge the trajectory back when it starts to drift away.
+\subsection{Architecture}
+Input trajectories are first encoded by the Trajectory Encoder, which produces a compact posterior context vector. This context initializes a surrogate posterior \(q(z_0\mid x)\) and conditions the Posterior Drift Net. The posterior drift network, implemented as an MLP with Fourier time embeddings, outputs both the control vector \(u\) and optional diffusion corrections \cite{Goodfellow2016}. The VSDE integrator then combines the fixed CNF drift, the learned control, and the Brownian diffusion to produce latent trajectories that are mapped back to the original space for reconstruction and diagnostics (see Figure~\ref{fig:architecture}).
+
+\subsection{Neural Networks}
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=1\linewidth]{figures/mlp_gru.png}
+    \caption{Diagram of the Multi-Layer Perceptron (MLP) used for controls and the Gated Recurrent Unit (GRU) encoder that summarizes trajectories.}
+    \label{fig:mlp-gru}
+\end{figure}
+The neural networks in VSDE are responsible for translating data into controls and summarizing temporal context. Figure~\ref{fig:mlp-gru} highlights both modules.
+\subsubsection{Multi-Layer Perceptron}
+The control network is a shallow but wide feed-forward network known as a Multi-Layer Perceptron (MLP). Each layer multiplies its inputs by learned weights, adds biases, and applies nonlinearities so the network can represent complex control policies. The MLP consumes the concatenated tuple \((z, ctx, \text{time emb})\) and outputs the controls. Residual connections inside the MLP help stabilize training when the control signal remains small.
+We can express the MLP as
+\begin{equation}
+u = \sigma_L(W_L \sigma_{L-1}(\cdots \sigma_1(W_1 x + b_1) + b_{L-1}) + b_L),
+\end{equation}
+where \(x=(z, ctx, \text{tizme emb})\), \(\sigma_i\) are nonlinearities activation functions, and \(\{W_i, b_i\}\) are learned weights and biases for layer \(i\).
+Training minimizes the joint loss \(\mathcal{L}\) described above, so each parameter is updated via a gradient step such as
+\begin{equation}
+W_i^{(l)} \leftarrow W_i^{(l)} - \eta \nabla_{W_i^{(l)}} \mathcal{L},\qquad b_i^{(l)} \leftarrow b_i^{(l)} - \eta \nabla_{b_i^{(l)}} \mathcal{L},
+\end{equation}
+where \(\eta\) is the learning rate from the optimizer. The gradients are computed via backpropagation through the layered MLP using the chain rule, which propagates loss signals backward through each nonlinear activation \cite{Goodfellow2016}; in practice we rely on the Adam optimizer \cite{adam} so the effective update also tracks first- and second-moment estimates of these gradients to stabilize and accelerate convergence.
+
+
+\subsubsection{Gated Recurrent Unit}
+The trajectory encoder uses a Gated Recurrent Unit (GRU), which is a type of recurrent network tailored for sequences \cite{Cho2014}. It processes the observation sequence one timestep at a time, updating its hidden state and deciding how much past information to keep via gating mechanisms. This allows the GRU to remember long-range dependencies without exploding gradients and to focus on recent changes when necessary, which is essential when the VSDE must condition on hours of simulated flow.
+The GRU update is guided by reset \(r\) and update \(z\) gates
+\begin{subequations}
+\begin{align}
+r_t &= \sigma(W_r x_t + U_r h_{t-1}),\\
+z_t &= \sigma(W_z x_t + U_z h_{t-1}),\\
+\tilde h_t &= \tanh(W_h x_t + U_h (r_t \odot h_{t-1})),\\
+h_t &= (1 - z_t) \odot h_{t-1} + z_t \odot \tilde h_t,
+\end{align}
+\end{subequations}
+
+\section{Activation Function}
+The VSDE control MLP uses Gaussian Error Linear Units (GELU) in each hidden layer, which blend linear and nonlinear behaviors and keep gradients smooth so the control signal changes gradually with the latent state. The GRU encoder relies on sigmoid activations for the reset and update gates and a tanh nonlinearity for the candidate hidden state; this combination ensures gate outputs stay in \([0,1]\) and that the recurrent dynamics remain bounded while still allowing nonlinear transformations of the inputs. A more detailed explanation of GRUs and MLP can be found in Appendix \ref{apx:gru_mlp}, along with why these activations are preferred for time-series modeling and function approximation.
+
+\subsection{Variational Inference}
+We perform variational inference by sampling \(n_{\text{particles}}\) latent initializations from \(q(z_0\mid x)\) and integrating each sample through the VSDE \cite{Rezende2015}. The ELBO decomposes into a reconstruction likelihood (driven by observation noise \(\sigma_{\text{obs}}\)), a KL divergence that anchors the posterior to a standard normal, and a control cost that penalizes large control efforts. The energy-based penalties described below are added to this objective to shepherd the latent trajectories toward physically consistent behavior.
+Sampling uses the reparameterization trick:
+\begin{equation}
+z_0 = \mu + \sigma \odot \epsilon,\quad \epsilon \sim \mathcal{N}(0, I),
+\end{equation}
+which lets gradients flow through the encoder parameters \((\mu, \sigma)\) when we backpropagate the loss. The gradient of the ELBO with respect to the parameters \(\theta\) is
+\begin{align}
+\nabla_\theta \mathcal{L} = \mathbb{E}_{q(z_0\mid x)}\left[\nabla_\theta \log p(x\mid z) - \lambda_{\text{KL}} \nabla_\theta \log q(z_0\mid x) + \cdots\right],
+\end{align}
+where the ellipsis hides control and physics loss derivatives and the expectation is approximated with our particles. The adjoint method ensures the gradients through the VSDE integrator remain tractable.
+
+\subsection{Training}
+\subsubsection{Optimizing the Path}
+We backpropagate through the integrator using the adjoint sensitivity method built into the CNF. The VSDE integrator is differentiable because we keep the time grid fixed and apply deterministic updates before adding the diffusion term. The optimizer updates the Posterior Drift Net weights, the diffusion log-parameter, and the posterior encoder simultaneously.
+
+\subsubsection{Dynamic Jacobian}
+Because the CNF defines an instantaneous velocity field, we can compute the Jacobian of the combined drift with respect to \(z\) during training. This Jacobian is needed for KL and control cost terms as well as for ensuring stability when coupling the CNF with the posterior drift.
+
+\subsubsection{Physical Loss Function}
+We augment the ELBO with two complementary physics-aware losses so the VSDE latent paths respect conserved quantities and known PDE structure. The first loss tracks kinetic energy fluctuations by computing \(\frac{1}{2}\rho\|z_{t+1} - z_t\|^2\) along each trajectory and penalizing sudden jumps that contradict the smooth advection-dominated physics; this couples adjacent timesteps through finite differences of latent velocities. The second loss enforces the residual of the compressible energy equation
+\(\rho c_p(\partial_t T + u \cdot \nabla T) = k \nabla^2 T + \Phi\)
+by discretizing the temporal derivatives via backward differences and estimating spatial gradients from the CNF decoder; penalizing this residual steers the diffusion and control terms to satisfy thermodynamic balance in expectation. Each term is averaged over particles before being added to the loss, and we scale them with \(\lambda_{\text{phys}}\) and \(\lambda_{\text{pde}}\) so the model can trade reconstruction fidelity for these physical regularizers.
+
+\subsubsection{Joint Evidence Lower-Bound}
+The final loss is
+\begin{multline}
+\mathcal{L} = -\mathbb{E}_{q(z_0\mid x)}\left[ \log p(x\mid z) \right] + \lambda_{\text{KL}} \mathrm{KL}(q(z_0\mid x) \| p(z_0)) \\ + \lambda_{u} \mathcal{L}_{\text{control}} + \lambda_{\text{phys}} \mathcal{L}_{\text{energy}} + \lambda_{\text{pde}} \mathcal{L}_{\text{balance}}.
+\end{multline}
+The \(\lambda\) weights for the KL, control, and physics penalties are instead selected manually in this study to balance numerical stability with expressive control rather than through an exhaustive grid search.
+
+\subsubsection{Hyperparameters and Optimizers}
+Training uses the Adam optimizer as described in \cite{adam}, with weight decay (AdamW) and cosine learning-rate annealing. The learning rate schedule is warmed up for the first 2k steps and decays toward 1e-5. Control cost scale and diffusion coefficients are initialized to encourage low-variance trajectories, and the physics weights start near zero to prevent destabilizing gradients.
+
+\subsection{Inference}
+\subsubsection{Joint ODE Integration}
+Inference samples from the encoder to obtain posterior contexts and then integrates the VSDE for both control and diffusion to produce latent trajectories. The output is decoded via the CNF to reconstruct the observable variables while preserving uncertainty quantification through the ensemble of particles.
+
+\subsubsection{Integration Methods}
+We expose Euler, Heun, RK4, and Dormand–Prince integrators for the deterministic part of the dynamics. Diffusion is always attached via Euler–Maruyama \eqref{eq:euler_maruyama}. The inference API allows selecting the integrator and diffusion scale so experiments can trade accuracy for speed, though emprical results shows little differences in accuracy across integrators for our application.
+
+\subsection{Guard Rails During Inference}
+Special-case logic clamps controls and enforces absorbing boundaries when trajectories approach invalid states, which prevents numerical explosions. If a trajectory wanders outside the training manifold, its weight in the ELBO computation is attenuated to focus the optimization on valid samples.
+We formalize this by defining a soft validity indicator
+\begin{equation}
+\gamma(z) = \exp\left(-\alpha \max\left(\|z\| - R, 0\right)^2\right),
+\end{equation}
+where \(R\) is a radius extracted from the training states and \(\alpha\) controls how sharply samples are down-weighted. The encoder weight is multiplied by \(\gamma(z)\) before being averaged, and the posterior control is clamped according to
+\begin{equation}
+u_{\text{clamp}} = \text{sign}(u) \min\left(|u|, u_{\text{max}}\right),
+\end{equation}
+ensuring the VSDE cannot inject unbounded drifts even when extrapolating."*** End Patch

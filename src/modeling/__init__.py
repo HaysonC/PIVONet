@@ -46,12 +46,12 @@ DATA STRUCTURES
 
 CFDTrajectorySequenceDataset:
     Input: List of TrajectoryResult objects from simulations
-    
+
     Preprocessing:
       1. Extract (positions, velocities) sequences
       2. Normalize: (x - mean) / std (computed from all data)
       3. Create sliding windows of sequence_length
-    
+
     Output per __getitem__:
       - input_trajectory: (sequence_length, spatial_dim)
       - target_trajectory: (sequence_length, spatial_dim)
@@ -65,7 +65,7 @@ Trainer:
               loss = model(batch)
               loss.backward()
               optimizer.step()
-              
+
               if loss < best_loss:
                   save_checkpoint()
 
@@ -160,7 +160,7 @@ MEMORY & PERFORMANCE
 Memory per batch:
     B × L × D × 4 bytes for float32
     B=batch_size, L=sequence_length, D=spatial_dim
-    
+
     Example: B=32, L=50, D=2 → 12.8 KB per batch (negligible)
     But activations during backprop: B × L × D × hidden_dim × layers
     Example: B=32, L=50, D=2, hidden=128, depth=3 → ~96 MB

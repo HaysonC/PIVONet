@@ -20,7 +20,7 @@ Structure:
     name: "Demo Baseline"
     slug: "demo-baseline"
     description: "Sanity check: simulate, train CNF, evaluate"
-    
+
     steps:
       - name: "Import Trajectories"
         script: "src/workflows/import_trajectories.py"
@@ -29,7 +29,7 @@ Structure:
           max_steps: 50
           dt: 0.01
           output_dir: "data/demo"
-      
+
       - name: "Train CNF"
         script: "src/workflows/train_cnf.py"
         params:
@@ -114,7 +114,7 @@ ADDING NEW EXPERIMENTS
 ===================================================================================
 
 1. Create YAML file: src/experiments/my_experiment.yaml
-   
+
     name: "My Experiment"
     slug: "my-experiment"
     description: "Brief description"

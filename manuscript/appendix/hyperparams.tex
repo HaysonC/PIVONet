@@ -1,0 +1,21 @@
+\section{Hyperparameter Summary} \label{apx:hyperparams}
+Table~\ref{tab:hyperparams} collects the representative hyperparameters for each flow case we evaluate. Each row highlights the configuration used for the trajectory sampling, CNF backbone training, VSDE controller fitting, and inference diagnostics for that flow.
+\begin{table}[h!]
+    \centering
+    \caption{Representative settings for each flow in the benchmark suite.}
+    \label{tab:hyperparams}
+    \begin{tabularx}{\linewidth}{lX}
+        \hline
+        \textbf{Flow} & \textbf{Key settings (trajectory / CNF / VSDE / inference)} \\
+        \hline
+        Euler vortex & 4096 particles, 240 steps, \(\Delta t=0.01\) / CNF: batch 512, 8 epochs, lr 0.002, hidden 64, depth 3, context 3, limit 1024 / VSDE: batch 2048, 50 epochs, lr 0.01, 64 particles, 120 steps, control cost 1.0, learnable diffusion / Inference: 64 particles, 120 steps, overlay outputs + phase plots. \\
+        Viscous shock tube & 1024 particles, 240 steps, \(\Delta t=0.01\) / CNF: batch 512, 8 epochs, lr 0.001, hidden 64, depth 3, context 3, limit 512 / VSDE: batch 128, 4 epochs, lr 0.005, 4 particles, 60 steps, control cost 1.0, learnable diffusion / Inference: 32 particles, 60 steps, overlay outputs + phase plots. \\
+        Axial compressor & 8192 particles, 180 steps, \(\Delta t=0.005\) / CNF: batch 1024, 10 epochs, lr 0.0015, hidden 128, depth 4, context 4, limit 2048 / VSDE: batch 1024, 30 epochs, lr 0.005, 96 particles, 150 steps, control cost 0.5, learnable diffusion / Inference: 96 particles, 150 steps, overlay outputs + flux diagnostics. \\
+        \hline
+    \end{tabularx}
+\end{table}
+
+The hyperparameters were selected based on preliminary tuning to balance training stability and inference accuracy across the different flow regimes. The CNF and VSDE settings reflect the complexity of the underlying dynamics, with more challenging flows requiring larger batch sizes, longer training epochs, and finer integration steps to capture the relevant features. The inference configurations ensure sufficient ensemble diversity to evaluate model performance effectively.
+
+
+You set and view specific hyperparameters in the code repository accompanying this manuscript, which includes configuration files and scripts to reproduce the experimental results reported herein. Those files are located in \texttt{src/experiments/}. Inside the files with \texttt{.yaml} extensions, you can find the hyperparameter values used for each flow case and experiment step.

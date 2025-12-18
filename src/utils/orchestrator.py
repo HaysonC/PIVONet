@@ -14,7 +14,13 @@ from typing import Any, Iterable, Sequence
 import yaml
 from rich.console import Console
 from rich.panel import Panel
-from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    TimeElapsedColumn,
+)
 
 from .paths import project_root
 from .console_gate import is_prompt_active
@@ -50,7 +56,9 @@ class ExperimentOrchestrator:
     ) -> None:
         self.console = console or Console()
         self.project_dir = project_root()
-        self.experiments_dir = experiments_dir or (self.project_dir / "src" / "experiments")
+        self.experiments_dir = experiments_dir or (
+            self.project_dir / "src" / "experiments"
+        )
         self.progress_mode = progress_mode
         self.step_progress_mode = step_progress_mode or "auto"
         self.device = self._detect_device()
@@ -59,7 +67,9 @@ class ExperimentOrchestrator:
         self._step_duration_history: dict[str, list[float]] = {}
         self._eta_bootstrap_factor = 1.5
         self._eta_bootstrap_min_add = 2.0
-        self._prompt_state_dir = self.project_dir / "cache" / "runtime" / "prompt_states"
+        self._prompt_state_dir = (
+            self.project_dir / "cache" / "runtime" / "prompt_states"
+        )
         self._prompt_state_dir.mkdir(parents=True, exist_ok=True)
         self._current_prompt_state_file: Path | None = None
 
@@ -72,7 +82,9 @@ class ExperimentOrchestrator:
     def run(self, slug: str, overrides: dict[str, Any] | None = None) -> None:
         spec = self._experiments.get(slug)
         if not spec:
-            raise KeyError(f"Experiment '{slug}' not found. Available: {', '.join(self._experiments)}")
+            raise KeyError(
+                f"Experiment '{slug}' not found. Available: {', '.join(self._experiments)}"
+            )
         spec_to_run = self._apply_overrides(spec, overrides or {})
         if overrides:
             formatted = ", ".join(f"{k}={v}" for k, v in overrides.items())
@@ -85,10 +97,14 @@ class ExperimentOrchestrator:
     def _load_experiments(self) -> dict[str, ExperimentSpec]:
         experiments: dict[str, ExperimentSpec] = {}
         if not self.experiments_dir.exists():
-            self.console.print(f"[yellow]Experiment directory {self.experiments_dir} does not exist yet.[/]")
+            self.console.print(
+                f"[yellow]Experiment directory {self.experiments_dir} does not exist yet.[/]"
+            )
             return experiments
 
-        for path in sorted(self.experiments_dir.glob("*.yml")) + sorted(self.experiments_dir.glob("*.yaml")):
+        for path in sorted(self.experiments_dir.glob("*.yml")) + sorted(
+            self.experiments_dir.glob("*.yaml")
+        ):
             with path.open("r", encoding="utf-8") as handle:
                 raw = yaml.safe_load(handle) or {}
             slug = str(raw.get("slug") or path.stem)
@@ -96,14 +112,20 @@ class ExperimentOrchestrator:
             description = raw.get("description", "")
             steps = [
                 ExperimentStep(
-                    name=step.get("name", f"step-{idx+1}"),
+                    name=step.get("name", f"step-{idx + 1}"),
                     description=step.get("description", ""),
                     script=step["script"],
                     params=step.get("params", {}) or {},
                 )
                 for idx, step in enumerate(raw.get("steps", []))
             ]
-            experiments[slug] = ExperimentSpec(slug=slug, name=name, description=description, steps=steps, source_path=path)
+            experiments[slug] = ExperimentSpec(
+                slug=slug,
+                name=name,
+                description=description,
+                steps=steps,
+                source_path=path,
+            )
         return experiments
 
     def _detect_device(self) -> str:
@@ -121,7 +143,9 @@ class ExperimentOrchestrator:
 
     def _run_experiment(self, spec: ExperimentSpec) -> None:
         if not spec.steps:
-            self.console.print(f"[yellow]Experiment '{spec.name}' has no steps to run.[/]")
+            self.console.print(
+                f"[yellow]Experiment '{spec.name}' has no steps to run.[/]"
+            )
             return
 
         header = Panel.fit(
@@ -137,9 +161,13 @@ class ExperimentOrchestrator:
         for idx, step in enumerate(spec.steps, start=1):
             self._run_step(idx, total, step)
         elapsed = time.perf_counter() - start
-        self.console.print(Panel.fit(f"✅ Finished '{spec.name}' in {elapsed:.2f}s", style="green"))
+        self.console.print(
+            Panel.fit(f"✅ Finished '{spec.name}' in {elapsed:.2f}s", style="green")
+        )
 
-    def _apply_overrides(self, spec: ExperimentSpec, overrides: dict[str, Any]) -> ExperimentSpec:
+    def _apply_overrides(
+        self, spec: ExperimentSpec, overrides: dict[str, Any]
+    ) -> ExperimentSpec:
         if not overrides:
             return spec
         new_steps: list[ExperimentStep] = []
@@ -154,7 +182,14 @@ class ExperimentOrchestrator:
                 else:
                     param_name = target[0]
                 params[param_name.replace("-", "_")] = value
-            new_steps.append(ExperimentStep(name=step.name, description=step.description, script=step.script, params=params))
+            new_steps.append(
+                ExperimentStep(
+                    name=step.name,
+                    description=step.description,
+                    script=step.script,
+                    params=params,
+                )
+            )
         return ExperimentSpec(
             slug=spec.slug,
             name=spec.name,
@@ -172,11 +207,15 @@ class ExperimentOrchestrator:
 
     def _run_step(self, position: int, total: int, step: ExperimentStep) -> None:
         label = f"[{position}/{total}] Running '{step.name}' on {self.device}"
-        self.console.print(Panel.fit(f"{label}\n{step.description}", title="Step", style="magenta"))
+        self.console.print(
+            Panel.fit(f"{label}\n{step.description}", title="Step", style="magenta")
+        )
 
         script_path = self._resolve_script(step.script)
         if not script_path.exists():
-            raise FileNotFoundError(f"Script not found for step '{step.name}': {script_path}")
+            raise FileNotFoundError(
+                f"Script not found for step '{step.name}': {script_path}"
+            )
 
         command = [sys.executable, str(script_path), *self._flatten_params(step.params)]
         self.console.print(f"→ Executing: {' '.join(command)}")
@@ -197,7 +236,9 @@ class ExperimentOrchestrator:
                 self._monitor_step_with_bar(step.name, process)
             else:
                 planned_epochs = self._extract_epoch_hint(step)
-                self._monitor_step_with_logs(step.name, process, step_start, position, total, planned_epochs)
+                self._monitor_step_with_logs(
+                    step.name, process, step_start, position, total, planned_epochs
+                )
         except Exception:
             process.kill()
             raise
@@ -208,7 +249,9 @@ class ExperimentOrchestrator:
         if step_elapsed > 0:
             self._completed_step_durations.append(step_elapsed)
             self._step_duration_history.setdefault(step.name, []).append(step_elapsed)
-        self.console.print(f"[green]✓[/] Step '{step.name}' completed in {step_elapsed:.1f}s.")
+        self.console.print(
+            f"[green]✓[/] Step '{step.name}' completed in {step_elapsed:.1f}s."
+        )
 
     @staticmethod
     def _extract_epoch_hint(step: ExperimentStep) -> int | None:
@@ -257,7 +300,9 @@ class ExperimentOrchestrator:
         # auto: prefer plain logging to avoid overlapping with child Rich bars
         return False
 
-    def _monitor_step_with_bar(self, step_name: str, process: subprocess.Popen[Any]) -> None:
+    def _monitor_step_with_bar(
+        self, step_name: str, process: subprocess.Popen[Any]
+    ) -> None:
         with Progress(
             SpinnerColumn(),
             BarColumn(),
@@ -325,7 +370,9 @@ class ExperimentOrchestrator:
                 last_log_at = now
             time.sleep(poll_interval)
 
-    def _estimate_step_eta(self, step_name: str, position: int, total_steps: int, elapsed: float) -> float | None:
+    def _estimate_step_eta(
+        self, step_name: str, position: int, total_steps: int, elapsed: float
+    ) -> float | None:
         if total_steps <= 0:
             return None
         safe_position = min(max(position, 1), total_steps)
@@ -400,7 +447,9 @@ class ExperimentOrchestrator:
         if self._current_prompt_state_file is None:
             return
         try:
-            self._current_prompt_state_file.write_text("1" if active else "0", encoding="utf-8")
+            self._current_prompt_state_file.write_text(
+                "1" if active else "0", encoding="utf-8"
+            )
         except OSError:
             return
 
@@ -421,7 +470,9 @@ def _parse_overrides(pairs: Sequence[str] | None) -> dict[str, Any]:
         return overrides
     for pair in pairs:
         if "=" not in pair:
-            raise ValueError(f"Invalid override '{pair}'. Expected format step.param=value")
+            raise ValueError(
+                f"Invalid override '{pair}'. Expected format step.param=value"
+            )
         key, raw_value = pair.split("=", 1)
         key = key.strip()
         if not key:
@@ -429,16 +480,24 @@ def _parse_overrides(pairs: Sequence[str] | None) -> dict[str, Any]:
         try:
             value = yaml.safe_load(raw_value)
         except yaml.YAMLError as exc:  # pragma: no cover - rare parsing failure
-            raise ValueError(f"Could not parse override value for '{key}': {exc}") from exc
+            raise ValueError(
+                f"Could not parse override value for '{key}': {exc}"
+            ) from exc
         overrides[key] = value
     return overrides
 
 
 def _cli(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Manage Flow experiment pipelines.")
-    parser.add_argument("--list", action="store_true", help="Print all available experiments.")
-    parser.add_argument("--run", metavar="SLUG", help="Run the experiment matching the provided slug.")
-    parser.add_argument("--dir", type=str, default=None, help="Override the experiments directory.")
+    parser.add_argument(
+        "--list", action="store_true", help="Print all available experiments."
+    )
+    parser.add_argument(
+        "--run", metavar="SLUG", help="Run the experiment matching the provided slug."
+    )
+    parser.add_argument(
+        "--dir", type=str, default=None, help="Override the experiments directory."
+    )
     parser.add_argument(
         "--progress-mode",
         choices=("auto", "bars", "plain"),

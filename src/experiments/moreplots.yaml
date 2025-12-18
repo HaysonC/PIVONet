@@ -1,0 +1,88 @@
+slug: mae-distribution-study
+name: MAE Distribution Study
+description: |
+  Run the VSDE inference stack on the incompressible cylinder, Euler vortex, and
+  viscous shock tube datasets, then aggregate the per-sample MAE arrays into a
+  single figure that highlights the tail behaviour of the ODE-only (CNF) vs VSDE
+  predictions.
+
+usage:
+  - "From the repo root, run `pivo --run-experiment mae-distribution-study` to execute the full analysis."
+
+steps:
+  - name: inference-inc-cylinder
+    description: Run VSDE inference on the incompressible cylinder bundle and capture the error arrays.
+    script: src/workflows/run_vsde_inference.py
+    params:
+      bundles:
+        - data/2d-inc-cylinder/trajectories
+      batch-size: 64
+      limit: 4096
+      workers: 0
+      cnf-checkpoint: cache/checkpoints/2d-inc-cylinder_cnf/cnf_latest.pt
+      vsde-checkpoint: cache/checkpoints/2d-inc-cylinder_vsde/vsde_latest.pt
+      cnf-hidden-dim: 64
+      cnf-depth: 3
+      context-dim: 3
+      z-dim: 2
+      ctx-dim: 128
+      output-dir: cache/artifacts/2d-inc-cylinder/vsde_inference
+      overlay-dir: overlays
+      save-error-distributions: true
+
+  - name: inference-euler-vortex
+    description: Run VSDE inference on the Euler vortex bundle so we can compare the CF baseline and VSDE uncertainty.
+    script: src/workflows/run_vsde_inference.py
+    params:
+      bundles:
+        - data/2d-euler-vortex/trajectories
+      batch-size: 64
+      limit: 4096
+      workers: 0
+      cnf-checkpoint: cache/checkpoints/2d-euler-vortex_cnf/cnf_latest.pt
+      vsde-checkpoint: cache/checkpoints/2d-euler-vortex_vsde/vsde_latest.pt
+      cnf-hidden-dim: 64
+      cnf-depth: 3
+      context-dim: 3
+      z-dim: 2
+      ctx-dim: 128
+      output-dir: cache/artifacts/2d-euler-vortex/vsde_inference
+      overlay-dir: overlays
+      save-error-distributions: true
+
+  - name: inference-viscous-shock-tube
+    description: Run VSDE inference on the viscous shock tube bundle to capture the harder tail behaviour.
+    script: src/workflows/run_vsde_inference.py
+    params:
+      bundles:
+        - data/2d-viscous-shock-tube/trajectories
+      batch-size: 64
+      limit: 4096
+      workers: 0
+      cnf-checkpoint: cache/checkpoints/2d-viscous-shock-tube_cnf/cnf_latest.pt
+      vsde-checkpoint: cache/checkpoints/2d-viscous-shock-tube_vsde/vsde_latest.pt
+      cnf-hidden-dim: 64
+      cnf-depth: 3
+      context-dim: 3
+      z-dim: 2
+      ctx-dim: 128
+      output-dir: cache/artifacts/2d-viscous-shock-tube/vsde_inference
+      overlay-dir: overlays
+      save-error-distributions: true
+
+  - name: plot-mae-distributions
+    description: Build the MAE distribution figure that contrasts ODE-only behaviour and VSDE output tails.
+    script: src/workflows/plot_mae_distributions.py
+    params:
+      artifact-dirs:
+        - cache/artifacts/2d-inc-cylinder/vsde_inference
+        - cache/artifacts/2d-euler-vortex/vsde_inference
+        - cache/artifacts/2d-viscous-shock-tube/vsde_inference
+      labels:
+        - Incompressible Cylinder
+        - Euler Vortex
+        - Viscous Shock Tube
+      output-dir: cache/artifacts/moreplots
+      figure-name: mae_error_distributions.png
+      summary-name: mae_distribution_summary.json
+      bins: 140

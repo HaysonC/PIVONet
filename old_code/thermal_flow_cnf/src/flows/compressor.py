@@ -2,7 +2,9 @@ import numpy as np
 from typing import Callable
 
 
-def compressor_flow(Umax_in: float, H_in: float, H_out: float, L: float = 1.0) -> Callable[[np.ndarray], np.ndarray]:
+def compressor_flow(
+    Umax_in: float, H_in: float, H_out: float, L: float = 1.0
+) -> Callable[[np.ndarray], np.ndarray]:
     """Planar compressor (converging channel) with half-height decreasing from ``H_in`` to ``H_out``.
 
     This implementation enforces incompressible continuity for the transverse velocity instead of a heuristic.
@@ -40,12 +42,14 @@ def compressor_flow(Umax_in: float, H_in: float, H_out: float, L: float = 1.0) -
         return H_in + s * (H_out - H_in)
 
     def u(xy: np.ndarray) -> np.ndarray:
-        x = float(xy[0]); y = float(xy[1])
+        x = float(xy[0])
+        y = float(xy[1])
         Hx_val = max(1e-8, Hx(x))
         Umax_x = Q / ((4.0 / 3.0) * Hx_val)
         ux = Umax_x * (1.0 - (y / Hx_val) ** 2)
         uy = Umax_x * dHdx * y * (Hx_val**2 - y**2) / (Hx_val**3)
         return np.array([ux, uy], dtype=float)
+
     # Attach channel metadata for visualization (dynamic boundaries)
     setattr(u, "Hx", Hx)
     setattr(u, "H_in", H_in)

@@ -19,7 +19,9 @@ class TrajectoryDataset(Dataset):
     def __len__(self) -> int:
         return self.trajs.shape[0]
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    def __getitem__(
+        self, idx: int
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         traj = torch.from_numpy(self.trajs[idx])  # (T+1, 2)
         x_final = traj[-1].to(torch.float32)
         x0 = torch.from_numpy(self.x0s[idx]).to(torch.float32)
@@ -37,7 +39,9 @@ class TrajectorySequenceDataset(Dataset):
         self.trajs = data["trajs"].astype(np.float32)  # (N, T, 2)
         self.x0s = data["x0s"].astype(np.float32)
         thetas = data["thetas"].astype(np.float32)
-        self.contexts = np.concatenate([self.x0s, thetas[:, None]], axis=1).astype(np.float32)
+        self.contexts = np.concatenate([self.x0s, thetas[:, None]], axis=1).astype(
+            np.float32
+        )
         T = self.trajs.shape[1]
         if normalize_time:
             self.time_grid = torch.linspace(0.0, 1.0, steps=T, dtype=torch.float32)
@@ -49,7 +53,9 @@ class TrajectorySequenceDataset(Dataset):
     def __len__(self) -> int:
         return int(self.trajs.shape[0])
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    def __getitem__(
+        self, idx: int
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         traj = torch.from_numpy(self.trajs[idx])  # (T, 2)
         context = torch.from_numpy(self.contexts[idx])  # (3,)
         times = self.time_grid.clone()

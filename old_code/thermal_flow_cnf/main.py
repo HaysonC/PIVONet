@@ -55,32 +55,52 @@ def cli_train(args):
     if args.dataset is None:
         # Try to find a dataset
         data_dir = os.path.join("thermal_flow_cnf", "data", "raw")
-        candidates = [os.path.join(data_dir, f) for f in os.listdir(data_dir) if f.endswith(".npz")]
+        candidates = [
+            os.path.join(data_dir, f)
+            for f in os.listdir(data_dir)
+            if f.endswith(".npz")
+        ]
         if not candidates:
-            raise FileNotFoundError("No dataset found. Run simulate first or pass --dataset.")
+            raise FileNotFoundError(
+                "No dataset found. Run simulate first or pass --dataset."
+            )
         dataset_path = sorted(candidates)[-1]
     else:
         dataset_path = args.dataset
 
     ds = TrajectoryDataset(dataset_path)
-    dl = DataLoader(ds, batch_size=args.batch or cfg["batch_size"], shuffle=True, num_workers=0)
+    dl = DataLoader(
+        ds, batch_size=args.batch or cfg["batch_size"], shuffle=True, num_workers=0
+    )
 
     model = CNF(dim=2, cond_dim=3, hidden_dim=64)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     ckpt_dir = os.path.join("thermal_flow_cnf", "checkpoints")
     os.makedirs(ckpt_dir, exist_ok=True)
-    train_cnf(model, dl, device=device, epochs=args.epochs or cfg["epochs"], lr=cfg["lr"], ckpt_dir=ckpt_dir)
+    train_cnf(
+        model,
+        dl,
+        device=device,
+        epochs=args.epochs or cfg["epochs"],
+        lr=cfg["lr"],
+        ckpt_dir=ckpt_dir,
+    )
 
 
 def cli_evaluate(args):
     from thermal_flow_cnf.src.evaluation.metrics import mean_squared_displacement
-    from thermal_flow_cnf.src.evaluation.visualize import plot_density_hist2d
 
     if args.dataset is None:
         data_dir = os.path.join("thermal_flow_cnf", "data", "raw")
-        candidates = [os.path.join(data_dir, f) for f in os.listdir(data_dir) if f.endswith(".npz")]
+        candidates = [
+            os.path.join(data_dir, f)
+            for f in os.listdir(data_dir)
+            if f.endswith(".npz")
+        ]
         if not candidates:
-            raise FileNotFoundError("No dataset found. Run simulate first or pass --dataset.")
+            raise FileNotFoundError(
+                "No dataset found. Run simulate first or pass --dataset."
+            )
         dataset_path = sorted(candidates)[-1]
     else:
         dataset_path = args.dataset
@@ -99,7 +119,12 @@ def build_parser():
     sub = p.add_subparsers(dest="cmd")
 
     ps = sub.add_parser("simulate")
-    ps.add_argument("--flow", type=str, default="poiseuille", choices=["uniform", "couette", "poiseuille"])
+    ps.add_argument(
+        "--flow",
+        type=str,
+        default="poiseuille",
+        choices=["uniform", "couette", "poiseuille"],
+    )
     ps.add_argument("--num", type=int, default=1000)
     ps.set_defaults(func=cli_simulate)
 

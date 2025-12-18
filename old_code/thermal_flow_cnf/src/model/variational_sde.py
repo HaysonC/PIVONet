@@ -24,7 +24,9 @@ class FourierTimeEmbedding(nn.Module):
         self.emb_dim = emb_dim
         self.max_freq = float(max_freq)
         # frequencies loglinearly spaced
-        freqs = torch.exp(torch.linspace(math.log(1.0), math.log(self.max_freq), emb_dim // 2))
+        freqs = torch.exp(
+            torch.linspace(math.log(1.0), math.log(self.max_freq), emb_dim // 2)
+        )
         self.register_buffer("freqs", freqs)
 
     def forward(self, t: torch.Tensor) -> torch.Tensor:
@@ -52,14 +54,36 @@ class BiGRUEncoder(nn.Module):
       context: (B, ctx_dim)
     """
 
-    def __init__(self, x_dim: int = 2, time_emb_dim: int = 32, rnn_hidden: int = 128, rnn_layers: int = 1, ctx_dim: int = 128, dropout: float = 0.0):
+    def __init__(
+        self,
+        x_dim: int = 2,
+        time_emb_dim: int = 32,
+        rnn_hidden: int = 128,
+        rnn_layers: int = 1,
+        ctx_dim: int = 128,
+        dropout: float = 0.0,
+    ):
         super().__init__()
         self.time_emb = FourierTimeEmbedding(time_emb_dim)
-        self.input_mlp = MLP(x_dim + time_emb_dim, rnn_hidden, hidden_dim=rnn_hidden, depth=2)
-        self.rnn = nn.GRU(rnn_hidden, rnn_hidden, num_layers=rnn_layers, batch_first=True, bidirectional=True, dropout=dropout if rnn_layers > 1 else 0.0)
+        self.input_mlp = MLP(
+            x_dim + time_emb_dim, rnn_hidden, hidden_dim=rnn_hidden, depth=2
+        )
+        self.rnn = nn.GRU(
+            rnn_hidden,
+            rnn_hidden,
+            num_layers=rnn_layers,
+            batch_first=True,
+            bidirectional=True,
+            dropout=dropout if rnn_layers > 1 else 0.0,
+        )
         self.ctx_proj = nn.Linear(2 * rnn_hidden, ctx_dim)
 
-    def forward(self, x_seq: torch.Tensor, t_seq: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def forward(
+        self,
+        x_seq: torch.Tensor,
+        t_seq: torch.Tensor,
+        mask: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
         # x_seq: (B, M, x_dim)
         B, M, _ = x_seq.shape
         t_emb = self.time_emb(t_seq.view(B * M, 1)).view(B, M, -1)
@@ -98,13 +122,27 @@ class PosteriorInit(nn.Module):
 class PosteriorDriftNet(nn.Module):
     """u_phi(z, t, context) optionally outputs drift correction and log diffusion adjustment."""
 
-    def __init__(self, z_dim: int, ctx_dim: int, time_emb_dim: int = 32, hidden: int = 128, out_diff: bool = False):
+    def __init__(
+        self,
+        z_dim: int,
+        ctx_dim: int,
+        time_emb_dim: int = 32,
+        hidden: int = 128,
+        out_diff: bool = False,
+    ):
         super().__init__()
         self.time_emb = FourierTimeEmbedding(time_emb_dim)
-        self.net = MLP(z_dim + ctx_dim + time_emb_dim, z_dim + (z_dim if out_diff else 0), hidden_dim=hidden, depth=3)
+        self.net = MLP(
+            z_dim + ctx_dim + time_emb_dim,
+            z_dim + (z_dim if out_diff else 0),
+            hidden_dim=hidden,
+            depth=3,
+        )
         self.out_diff = out_diff
 
-    def forward(self, z: torch.Tensor, t: torch.Tensor, ctx: torch.Tensor) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+    def forward(
+        self, z: torch.Tensor, t: torch.Tensor, ctx: torch.Tensor
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         # z: (N, z_dim), t: scalar or (N,1), ctx: (N, ctx_dim)
         N = z.size(0)
         if t.dim() == 0:
@@ -142,9 +180,21 @@ class VariationalSDEModel(nn.Module):
     ):
         super().__init__()
         enc_cfg = encoder_cfg or {}
-        self.encoder = BiGRUEncoder(x_dim=enc_cfg.get("x_dim", 2), time_emb_dim=enc_cfg.get("time_emb_dim", 32), rnn_hidden=enc_cfg.get("rnn_hidden", 128), rnn_layers=enc_cfg.get("rnn_layers", 1), ctx_dim=ctx_dim)
+        self.encoder = BiGRUEncoder(
+            x_dim=enc_cfg.get("x_dim", 2),
+            time_emb_dim=enc_cfg.get("time_emb_dim", 32),
+            rnn_hidden=enc_cfg.get("rnn_hidden", 128),
+            rnn_layers=enc_cfg.get("rnn_layers", 1),
+            ctx_dim=ctx_dim,
+        )
         self.post_init = PosteriorInit(ctx_dim, z_dim, hidden=init_hidden)
-        self.post_drift = PosteriorDriftNet(z_dim, ctx_dim, time_emb_dim=enc_cfg.get("time_emb_dim", 32), hidden=drift_hidden, out_diff=False)
+        self.post_drift = PosteriorDriftNet(
+            z_dim,
+            ctx_dim,
+            time_emb_dim=enc_cfg.get("time_emb_dim", 32),
+            hidden=drift_hidden,
+            out_diff=False,
+        )
         # if diffusion learnable, a positive scalar per-dim or global
         if diffusion_learnable:
             self.log_diff_param = nn.Parameter(torch.tensor(-3.0))
@@ -158,7 +208,9 @@ class VariationalSDEModel(nn.Module):
             p.requires_grad_(False)
         self.cnf.eval()
 
-    def sample_z0(self, ctx: torch.Tensor, n_particles: int = 1) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def sample_z0(
+        self, ctx: torch.Tensor, n_particles: int = 1
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         # returns z0: (P*B, z_dim), mu:(B,z), logvar:(B,z)
         mu, logvar = self.post_init(ctx)
         std = torch.exp(0.5 * logvar)
@@ -201,7 +253,9 @@ class VariationalSDEModel(nn.Module):
         if align_to_observations:
             x0 = x_seq[:, 0, :]  # (B, D)
             if anchor_noise > 0.0:
-                noise = anchor_noise * torch.randn(n_particles, B, x0.size(1), device=device, dtype=x_seq.dtype)
+                noise = anchor_noise * torch.randn(
+                    n_particles, B, x0.size(1), device=device, dtype=x_seq.dtype
+                )
                 z0 = x0.unsqueeze(0) + noise
             else:
                 z0 = x0.unsqueeze(0).expand(n_particles, -1, -1)
@@ -209,7 +263,9 @@ class VariationalSDEModel(nn.Module):
         else:
             z0_all, _, _ = self.sample_z0(posterior_ctx, n_particles)
         N = z0_all.size(0)
-        posterior_ctx_rep = posterior_ctx.unsqueeze(0).repeat(n_particles, 1, 1).view(N, -1)
+        posterior_ctx_rep = (
+            posterior_ctx.unsqueeze(0).repeat(n_particles, 1, 1).view(N, -1)
+        )
         cnf_ctx = context.to(device=device, dtype=x_seq.dtype)
         cnf_ctx_rep = cnf_ctx.unsqueeze(0).repeat(n_particles, 1, 1).view(N, -1)
 
@@ -271,7 +327,9 @@ class VariationalSDEModel(nn.Module):
                 xi = torch.randn_like(z)
                 noise_scale = torch.sqrt(torch.clamp(dt, min=1e-12))
                 z_pred = z + drift * dt + xi * (g * noise_scale)
-                f_theta_pred = self.cnf.eval_field(z_pred, cnf_ctx, float((t_i + dt).item()))
+                f_theta_pred = self.cnf.eval_field(
+                    z_pred, cnf_ctx, float((t_i + dt).item())
+                )
                 u_pred, _ = self.post_drift(z_pred, t_i + dt, posterior_ctx)
                 drift_pred = f_theta_pred + u_pred
                 z = z + 0.5 * (drift + drift_pred) * dt + xi * (g * noise_scale)
@@ -308,14 +366,18 @@ class VariationalSDEModel(nn.Module):
         # Ensure all samples share the same observation grid (current implementation assumption)
         ref_times = t_seq[0]
         if not torch.allclose(t_seq, ref_times.unsqueeze(0).expand_as(t_seq)):
-            raise ValueError("VariationalSDEModel.compute_elbo expects a shared time grid across the batch.")
+            raise ValueError(
+                "VariationalSDEModel.compute_elbo expects a shared time grid across the batch."
+            )
 
         # Encode amortised posterior context
         posterior_ctx = self.encoder(x_seq, t_seq, mask)
         z0_all, mu, logvar = self.sample_z0(posterior_ctx, n_particles)
         N = z0_all.size(0)
         # Repeat contexts for particles
-        posterior_ctx_rep = posterior_ctx.unsqueeze(0).repeat(n_particles, 1, 1).view(N, -1)
+        posterior_ctx_rep = (
+            posterior_ctx.unsqueeze(0).repeat(n_particles, 1, 1).view(N, -1)
+        )
         cnf_ctx = context.to(device=device, dtype=x_seq.dtype)
         cnf_ctx_rep = cnf_ctx.unsqueeze(0).repeat(n_particles, 1, 1).view(N, -1)
 
@@ -346,7 +408,7 @@ class VariationalSDEModel(nn.Module):
 
         obs_var = float(obs_std) ** 2
         diff_obs = (z_obs - x_target) * mask_exp
-        sq_err = (diff_obs ** 2).sum(dim=3) / obs_var
+        sq_err = (diff_obs**2).sum(dim=3) / obs_var
         log_norm = mask_exp.squeeze(-1) * math.log(2.0 * math.pi * obs_var)
         log_px = -0.5 * (sq_err + log_norm)
         log_px = log_px.sum(dim=2)  # (P, B)

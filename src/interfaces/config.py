@@ -41,13 +41,9 @@ class SimulationConfig:
     @property
     def pyfr_output_dir(self) -> Path:
         return self.data_root / self.pyfr_output_subdir
-    
-    
-
 
     def __getitem__(self, key: str, default: Any = None) -> Any:
         return getattr(self, key, default)
-    
 
     def get(self, key: str, default: Any = None) -> Any:
         return getattr(self, key, default)

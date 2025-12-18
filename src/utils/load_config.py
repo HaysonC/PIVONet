@@ -37,7 +37,9 @@ def load_config(path: str | Path | None = None) -> SimulationConfig:
         data_root=project_root() / "data",
         velocity_subdir=str(simulation.get("velocity_subdir", "cfd/npy/velocity")),
         density_subdir=str(simulation.get("density_subdir", "cfd/npy/density")),
-        trajectory_subdir=str(simulation.get("trajectory_subdir", "cfd/npy/trajectory")),
+        trajectory_subdir=str(
+            simulation.get("trajectory_subdir", "cfd/npy/trajectory")
+        ),
         pyfr_backend=str(simulation.get("pyfr_backend", "cpu")),
         pyfr_case=str(simulation.get("pyfr_case", "")),
         pyfr_output_subdir=str(simulation.get("pyfr_output_subdir", "cfd/pyfr/output")),

@@ -13,7 +13,11 @@ from src.utils.paths import project_root
 
 def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--input", default="data/demo/demo_orchestrator_bundle.npz", help="Relative or absolute path to the bundle produced by prepare_demo_artifacts.")
+    parser.add_argument(
+        "--input",
+        default="data/demo/demo_orchestrator_bundle.npz",
+        help="Relative or absolute path to the bundle produced by prepare_demo_artifacts.",
+    )
     return parser.parse_args(argv)
 
 
@@ -29,7 +33,9 @@ def main() -> None:
     args = _parse_args()
     bundle_path = _resolve_input(args.input)
     if not bundle_path.exists():
-        raise FileNotFoundError(f"Bundle not found at {bundle_path}. Run prepare_demo_artifacts first.")
+        raise FileNotFoundError(
+            f"Bundle not found at {bundle_path}. Run prepare_demo_artifacts first."
+        )
 
     data = np.load(bundle_path)
     history = data["history"]

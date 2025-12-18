@@ -2,7 +2,9 @@ import numpy as np
 from typing import Callable
 
 
-def bend_flow(Umax: float, H: float, bend_angle_deg: float = 90.0, L: float = 1.0) -> Callable[[np.ndarray], np.ndarray]:
+def bend_flow(
+    Umax: float, H: float, bend_angle_deg: float = 90.0, L: float = 1.0
+) -> Callable[[np.ndarray], np.ndarray]:
     """2D bend flow with parabolic speed and gentle secondary (Dean-like) transverse motion.
 
     Kinematic model:
@@ -21,6 +23,7 @@ def bend_flow(Umax: float, H: float, bend_angle_deg: float = 90.0, L: float = 1.
     def theta_of_x(x: float) -> float:
         s = np.clip(x / L, 0.0, 1.0)
         return s * theta_f
+
     dtheta_dx = theta_f / L
     k = 0.3  # small coefficient for secondary flow strength (dimensionless)
 

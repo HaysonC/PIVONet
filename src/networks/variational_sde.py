@@ -12,6 +12,10 @@ import torch.nn.functional as F
 from .cnf import CNFModel
 from .encoder import TrajectoryEncoder, PosteriorInit
 from .mlp import MLP
+from ..utils.physical_losses import (
+    energy_balance_loss,
+    energy_conservation_loss,
+)
 
 
 class PosteriorDriftNet(nn.Module):
@@ -158,6 +162,9 @@ class VariationalSDEModel(nn.Module):
         encoder_hidden: int = 128,
         drift_hidden: int = 128,
         diffusion_learnable: bool = False,
+        use_physics_loss: bool = False,
+        energy_balance_weight: float = 1.0,
+        energy_conservation_weight: float = 1.0,
     ) -> None:
         """
         Initialize the Variational SDE model.
@@ -175,6 +182,11 @@ class VariationalSDEModel(nn.Module):
                 Controls capacity of learned posterior drift u(z, t).
             diffusion_learnable (bool, default=False): If True, diffusion coefficient g is a learnable
                 parameter. If False, g is fixed at exp(-3) ≈ 0.05. Set True for complex dynamics.
+            use_physics_loss (bool, default=False): Enables collecting physics-constrained penalties
+                in the ELBO (energy balance + energy conservation). The weights below are ignored if
+                this flag is False.
+            energy_balance_weight (float, default=1.0): Relative weighting for the energy balance loss.
+            energy_conservation_weight (float, default=1.0): Relative weighting for the energy conservation loss.
         
         **Returns**: None
         
@@ -197,6 +209,9 @@ class VariationalSDEModel(nn.Module):
         else:
             self.register_buffer("log_diff_param", torch.tensor(-3.0))
         self.z_dim = z_dim
+        self.use_physics_loss = use_physics_loss
+        self.energy_balance_weight = energy_balance_weight
+        self.energy_conservation_weight = energy_conservation_weight
 
     def sample_z0(self, ctx: torch.Tensor, n_particles: int = 1) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
@@ -508,294 +523,7 @@ class VariationalSDEModel(nn.Module):
         
         # Don't override the last point - let VSDE integration determine it naturally
         return torch.stack(traj, dim=0), torch.stack(controls, dim=0), times
-
-    def compute_elbo(
-        self,
-        x_seq: torch.Tensor,
-        t_seq: torch.Tensor,
-        context: torch.Tensor,
-        mask: Optional[torch.Tensor] = None,
-        n_particles: int = 4,
-        obs_std: float = 0.05,
-        kl_warmup: float = 1.0,
-        control_cost_scale: float = 1.0,
-        n_integration_steps: int = 50,
-    ) -> Tuple[torch.Tensor, dict]:
-        """
-        Compute evidence lower bound (ELBO) for variational inference.
-        
-        ELBO = E_z[log p(x|z)] - KL(q(z|x) || p(z)) - cost(controls)
-        
-        Lower bound on log-likelihood. Maximizing ELBO ↔ maximizing likelihood (with regularization).
-        
-        **Parameters**:
-            x_seq (Tensor): Observed trajectory sequence, shape (batch_size, n_timesteps, dim)
-            t_seq (Tensor): Time grid, shape (n_timesteps,) or (batch_size, n_timesteps)
-            context (Tensor): CNF conditioning context, shape (batch_size, cond_dim)
-            mask (Tensor | None): Valid sample mask, shape (batch_size, n_timesteps)
-            n_particles (int, default=4): Number of samples for Monte Carlo ELBO estimate.
-                More particles → lower variance but slower.
-            obs_std (float, default=0.05): Observation noise std dev. Likelihood variance.
-                Smaller → tighter fit, larger → more robust to mismatch.
-            kl_warmup (float, default=1.0): Weight on KL-divergence term.
-                1.0 → standard ELBO. <1.0 → posterior collapse reduction (entropy regularization).
-            control_cost_scale (float, default=1.0): Weight on control cost regularization.
-                Encourages simple learned dynamics. Typical: 0.1-1.0.
-            n_integration_steps (int, default=50): ODE solver steps for trajectory generation
-        
-        **Returns**:
-            Tuple[Tensor, dict]: (loss, stats)
-                - loss (Tensor): Scalar loss = -ELBO (for backward pass)
-                - stats (dict): Diagnostic statistics with keys:
-                    - "elbo": ELBO value
-                    - "log_px": Reconstruction log-likelihood
-                    - "control_cost": Control cost term
-                    - "kl_z0": KL-divergence term
-        
-        **Side Effects**: None (gradient tracking enabled for backprop)
-        
-        **Time Complexity**: O(n_particles × n_timesteps × batch_size) for likelihood computation
-        
-        **Algorithm** (ELBO Decomposition):
-        
-        1. **Encoding**: x_seq → posterior_ctx via encoder
-        2. **Sampling**: Sample z ~ q(z|x) with n_particles, including (μ, log-var) for KL
-        3. **Integration**: VSDE forward pass to generate z(t) trajectories
-        4. **Interpolation**: Match generated times to observed times via nearest neighbor
-        5. **Reconstruction**: log p(x|z) = -||x - z||² / (2·obs_std²)
-        6. **KL divergence**: KL(q||p) = 0.5 Σ(μ² + σ² - 1 - log σ²)
-        7. **Control cost**: Σ ∫ ||u||²/g² dt (penalizes complex controls)
-        8. **ELBO**: log p(x|z) - control_cost_scale·cost - kl_warmup·kl
-        
-        **ELBO Components**:
-        - **log_px** (reconstruction): Negative squared error scaled by obs_std. Larger → better fit.
-        - **kl_z0** (KL-divergence): Regularizes posterior. Prevents posterior collapse.
-        - **control_cost**: Penalties ||u||² in latent space. Prevents overfitting.
-        
-        **Hyperparameter Effects**:
-        - **obs_std**: If trajectories have mismatch, increase. If overfitting, decrease.
-        - **kl_warmup**: If KL → 0 (collapse), reduce to 0.1-0.5 for first epoch.
-        - **control_cost_scale**: If underfitting, reduce to 0.01-0.1. If overfitting, increase.
-        
-        **Usage Example**::
-        
-            loss, stats = model.compute_elbo(
-                x_seq=obs_trajectory,
-                t_seq=times,
-                context=velocity_context,
-                n_particles=8,
-                obs_std=0.05,
-                kl_warmup=1.0,
-                control_cost_scale=0.1
-            )
-            loss.backward()
-            optimizer.step()
-            print(f"ELBO: {stats['elbo']:.4f}, "
-                  f"log_px: {stats['log_px']:.4f}, "
-                  f"KL: {stats['kl_z0']:.4f}")
-        """
-        device = x_seq.device
-        b, m, d = x_seq.shape
-        if t_seq.dim() == 1:
-            t_seq = t_seq.unsqueeze(0).expand(b, -1)
-        
-        # Encode trajectory to posterior context
-        posterior_ctx = self.encoder(x_seq, t_seq, mask)
-        
-        # Sample latent codes with reparameterization trick
-        z0_all, mu, logvar = self.sample_z0(posterior_ctx, n_particles)
-        n = z0_all.size(0)
-        posterior_ctx_rep = posterior_ctx.unsqueeze(0).repeat(n_particles, 1, 1).view(n, -1)
-        cnf_ctx = context.to(device=device, dtype=x_seq.dtype)
-        cnf_ctx_rep = cnf_ctx.unsqueeze(0).repeat(n_particles, 1, 1).view(n, -1)
-        ref_times = t_seq[0]
-        
-        # Integrate VSDE posterior to generate trajectories
-        traj, u_traj, times = self.integrate_posterior_sde(
-            z0_all, posterior_ctx_rep, cnf_ctx_rep, ref_times, 
-            n_steps=n_integration_steps
-        )
-        traj = traj.view(traj.size(0), n_particles, b, d)
-        u_traj = u_traj.view(u_traj.size(0), n_particles, b, d)
-        
-        # Match generated times to observed times via nearest neighbor
-        diff = torch.abs(times.unsqueeze(1) - ref_times.unsqueeze(0))
-        idxs = torch.argmin(diff, dim=0)
-        z_obs = traj.index_select(0, idxs)
-        z_obs = z_obs.permute(1, 2, 0, 3)
-        
-        # Compute reconstruction likelihood: log p(x|z)
-        x_target = x_seq.unsqueeze(0).expand_as(z_obs)
-        mask_exp = mask.unsqueeze(0).unsqueeze(-1) if mask is not None else torch.ones_like(x_target)
-        obs_var = float(obs_std) ** 2
-        diff_obs = (z_obs - x_target) * mask_exp
-        sq_err = (diff_obs ** 2).sum(dim=3) / obs_var
-        log_norm = mask_exp.squeeze(-1) * math.log(2.0 * math.pi * obs_var)
-        log_px = -0.5 * (sq_err + log_norm)
-        log_px = log_px.sum(dim=2).mean(dim=0).mean()
-        
-        # Compute KL-divergence: KL(q(z|x) || p(z))
-        # KL(N(μ,σ²) || N(0,I)) = 0.5 Σ(μ² + σ² - 1 - log σ²)
-        kl_z0 = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp(), dim=1).mean()
-        
-        # Compute control cost: ∫ ||u||² / g² dt
-        g = F.softplus(self.log_diff_param)
-        g2 = g.pow(2) + 1e-12
-        dt = (times[1:] - times[:-1]).view(-1, 1, 1)
-        control_integrand = (u_traj.pow(2).sum(dim=3) / g2) * dt
-        control_cost = 0.5 * control_integrand.sum(dim=0).mean()
-        
-        # Combine into ELBO: log p(x|z) - control_cost - KL(q||p)
-        elbo = log_px - control_cost_scale * control_cost - kl_warmup * kl_z0
-        loss = -elbo
-        
-        stats = {
-            "elbo": float(elbo.item()),
-            "log_px": float(log_px.item()),
-            "control_cost": float(control_cost.item()),
-            "kl_z0": float(kl_z0.item()),
-        }
-        return loss, stats
-        self,
-        z0: torch.Tensor,
-        posterior_ctx: torch.Tensor,
-        cnf_ctx: torch.Tensor,
-        t_obs: torch.Tensor,
-        n_steps: int = 50,
-        length_scale: float = 1.0,
-        cnf_start: Optional[torch.Tensor] = None,
-        cnf_final: Optional[torch.Tensor] = None,
-        diffusion_scale: float = 1.0,
-        integrator: str = "euler",
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Integrate VSDE with optional fixed CNF endpoints.
-        
-        Args:
-            cnf_start: If provided, fix first timestep to this position (overrides z0)
-            cnf_final: If provided, fix last timestep to this position
-            diffusion_scale: Multiplier on learned diffusion to increase wiggling
-            integrator: One of {"euler", "improved_euler", "rk4"}. For SDEs, diffusion is applied via
-                Euler-Maruyama in all modes; the drift component uses the chosen integrator.
-        """
-        device = z0.device
-        dtype = z0.dtype
-        # Use the observed time grid if provided to match ground truth resolution.
-        # Expect t_obs in normalized [0,1]. If batched, use the first trajectory's times.
-        if t_obs.dim() == 2:
-            times = t_obs[0].to(device=device, dtype=dtype)
-        else:
-            times = t_obs.to(device=device, dtype=dtype)
-        # If caller passes an explicit n_steps differing from observed, optionally resample.
-        # Here we prioritize exact matching to the observation grid.
-        if times.numel() < 2:
-            # Fallback to a minimal grid
-            steps = max(2, int(n_steps))
-            times = torch.linspace(0.0, 1.0, steps=steps, device=device, dtype=dtype)
-        
-        # Initialize first timestep (fixed to CNF start if provided)
-        z = cnf_start if cnf_start is not None else z0
-        traj = [z]
-        controls = []
-        g_base = F.softplus(self.log_diff_param) * float(diffusion_scale)  # Base diffusion with scaling
-        
-        # Integrate all timesteps with VSDE posterior drift + diffusion
-        # If CNF endpoints are provided, they constrain where we start and should end up,
-        # but VSDE drift naturally guides toward the endpoint (not forced)
-        integrator = integrator.lower()
-        for i in range(times.numel() - 1):
-            t_i = times[i]
-            t_next = times[i + 1]
-            dt_normalized = t_next - t_i
-            
-            # Time-dependent diffusion: decay toward endpoint to reduce wild oscillations
-            # g(t) = g_base * (1 - t)^2 so diffusion → 0 as t → 1
-            time_decay = (1.0 - float(t_i.item())) ** 1
-            g = g_base * time_decay
-
-            # Evaluate drift terms
-            f_theta = self.cnf.eval_field(z, cnf_ctx, float(t_i.item())) * float(max(0.0, length_scale))
-            u, _ = self.post_drift(z, t_i, posterior_ctx)
-            drift = f_theta + u
-
-            if integrator == "euler":
-                z_proposed = z + drift * dt_normalized
-                controls.append(u)
-            elif integrator in ("improved_euler", "heun"):
-                # Heun's method: predictor-corrector on drift
-                z_pred = z + drift * dt_normalized
-                f_theta_pred = self.cnf.eval_field(z_pred, cnf_ctx, float(t_next.item())) * float(max(0.0, length_scale))
-                u_pred, _ = self.post_drift(z_pred, t_next, posterior_ctx)
-                drift_corr = 0.5 * (drift + (f_theta_pred + u_pred))
-                z_proposed = z + drift_corr * dt_normalized
-                controls.append(u)
-            elif integrator == "rk4":
-                # Classical RK4 on drift part; diffusion stays Euler-Maruyama
-                k1_f = self.cnf.eval_field(z, cnf_ctx, float(t_i.item())) * float(max(0.0, length_scale))
-                k1_u, _ = self.post_drift(z, t_i, posterior_ctx)
-                k1 = k1_f + k1_u
-
-                z2 = z + 0.5 * dt_normalized * k1
-                t2 = t_i + 0.5 * dt_normalized
-                k2_f = self.cnf.eval_field(z2, cnf_ctx, float(t2.item())) * float(max(0.0, length_scale))
-                k2_u, _ = self.post_drift(z2, t2, posterior_ctx)
-                k2 = k2_f + k2_u
-
-                z3 = z + 0.5 * dt_normalized * k2
-                t3 = t_i + 0.5 * dt_normalized
-                k3_f = self.cnf.eval_field(z3, cnf_ctx, float(t3.item())) * float(max(0.0, length_scale))
-                k3_u, _ = self.post_drift(z3, t3, posterior_ctx)
-                k3 = k3_f + k3_u
-
-                z4 = z + dt_normalized * k3
-                t4 = t_next
-                k4_f = self.cnf.eval_field(z4, cnf_ctx, float(t4.item())) * float(max(0.0, length_scale))
-                k4_u, _ = self.post_drift(z4, t4, posterior_ctx)
-                k4 = k4_f + k4_u
-
-                drift_rk = (k1 + 2 * k2 + 2 * k3 + k4) / 6.0
-                z_proposed = z + drift_rk * dt_normalized
-                controls.append(k1_u)  # log first-stage control for analysis
-            elif integrator == "dopri5":
-                # Dormand-Prince RK5(4) method on drift part; diffusion stays Euler-Maruyama
-                # Coefficients from "Numerical Recipes" and Wikipedia
-                a = [0, 1/5, 3/10, 4/5, 8/9, 1]
-                b = [
-                    [],
-                    [1/5],
-                    [3/40, 9/40],
-                    [44/45, -56/15, 32/9],
-                    [19372/6561, -25360/2187, 64448/6561, -212/729],
-                    [9017/3168, -355/33, 46732/5247, 49/176, -5103/18656],
-                ]
-                c = [35/384, 0, 500/1113, 125/192, -2187/6784, 11/84]
-
-                k = []
-                for s in range(6):
-                    z_s = z.clone()
-                    for j in range(s):
-                        if b[s]:
-                            z_s = z_s + dt_normalized * b[s][j] * k[j]
-                    t_s = t_i + a[s] * dt_normalized
-                    f_theta_s = self.cnf.eval_field(z_s, cnf_ctx, float(t_s.item())) * float(max(0.0, length_scale))
-                    u_s, _ = self.post_drift(z_s, t_s, posterior_ctx)
-                    k_s = f_theta_s + u_s
-                    k.append(k_s)
-
-                drift_rk = sum(c[s] * k[s] for s in range(6))
-                z_proposed = z + drift_rk * dt_normalized
-                controls.append(k[0])  # log first-stage control for analysis
-            else:
-                raise ValueError(f"Unknown integrator: {integrator}. Use 'euler', 'improved_euler', 'rk4', or 'dopri5'.")
-
-            # Add diffusion via Euler-Maruyama
-            xi = torch.randn_like(z)
-            noise_scale = torch.sqrt(torch.clamp(dt_normalized, min=1e-12))
-            z = z_proposed + xi * (g * noise_scale)
-            traj.append(z)
-        
-        # Don't override the last point - let VSDE integration determine it naturally
-        return torch.stack(traj, dim=0), torch.stack(controls, dim=0), times
-
+    
     def compute_elbo(
         self,
         x_seq: torch.Tensor,
@@ -840,12 +568,35 @@ class VariationalSDEModel(nn.Module):
         dt = (times[1:] - times[:-1]).view(-1, 1, 1)
         control_integrand = (u_traj.pow(2).sum(dim=3) / g2) * dt
         control_cost = 0.5 * control_integrand.sum(dim=0).mean()
-        elbo = log_px - control_cost_scale * control_cost - kl_warmup * kl_z0
+        zero = x_seq.new_tensor(0.0)
+        physics_loss = zero.clone()
+        energy_balance_term = zero.clone()
+        energy_conservation_term = zero.clone()
+        if self.use_physics_loss and (self.energy_balance_weight != 0.0 or self.energy_conservation_weight != 0.0):
+            flattened = traj.view(traj.size(0), -1, d)
+            temperature = 0.5 * flattened.pow(2).sum(dim=-1)
+            velocity = torch.zeros_like(flattened)
+            if times.numel() > 1:
+                delta_t = torch.clamp(times[1:] - times[:-1], min=1e-6)
+                delta_t = delta_t.view(-1, 1, 1)
+                velocity_diff = (flattened[1:] - flattened[:-1]) / delta_t
+                velocity[1:] = velocity_diff
+                velocity[0] = velocity_diff[0]
+            energy_balance_term = energy_balance_loss(temperature, times, velocity)
+            energy_conservation_term = energy_conservation_loss(flattened, times)
+            physics_loss = (
+                self.energy_balance_weight * energy_balance_term
+                + self.energy_conservation_weight * energy_conservation_term
+            )
+        elbo = log_px - control_cost_scale * control_cost - kl_warmup * kl_z0 - physics_loss
         loss = -elbo
         stats = {
             "elbo": float(elbo.item()),
             "log_px": float(log_px.item()),
             "control_cost": float(control_cost.item()),
             "kl_z0": float(kl_z0.item()),
+            "physics_loss": float(physics_loss.item()),
+            "energy_balance_loss": float(energy_balance_term.item()),
+            "energy_conservation_loss": float(energy_conservation_term.item()),
         }
         return loss, stats

@@ -32,33 +32,114 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=["data/cfd/trajectories"],
         help="One or more bundle directories/files for training data.",
     )
-    parser.add_argument("--batch-size", type=int, default=16, help="Mini-batch size for trajectory training.")
-    parser.add_argument("--epochs", type=int, default=3, help="Training epochs for the variational SDE model.")
-    parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate for AdamW.")
-    parser.add_argument("--n-particles", type=int, default=4, help="Particles per trajectory when approximating the ELBO.")
-    parser.add_argument("--n-integration-steps", type=int, default=50, help="Discretization steps for the SDE integrator.")
-    parser.add_argument("--obs-std", type=float, default=0.05, help="Observation noise scale.")
-    parser.add_argument("--kl-warmup", type=float, default=1.0, help="Weight for the KL term.")
-    parser.add_argument("--control-cost-scale", type=float, default=1.0, help="Weight for the control energy penalty.")
-    parser.add_argument("--workers", type=int, default=0, help="DataLoader worker processes.")
-    parser.add_argument("--ckpt-dir", default="cache/checkpoints/vsde", help="Directory for VSDE checkpoints.")
-    parser.add_argument("--artifact-dir", default=None, help="Directory for plots/sample bundles (defaults to <ckpt-dir>/artifacts).")
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=16,
+        help="Mini-batch size for trajectory training.",
+    )
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=3,
+        help="Training epochs for the variational SDE model.",
+    )
+    parser.add_argument(
+        "--lr", type=float, default=1e-3, help="Learning rate for AdamW."
+    )
+    parser.add_argument(
+        "--n-particles",
+        type=int,
+        default=4,
+        help="Particles per trajectory when approximating the ELBO.",
+    )
+    parser.add_argument(
+        "--n-integration-steps",
+        type=int,
+        default=50,
+        help="Discretization steps for the SDE integrator.",
+    )
+    parser.add_argument(
+        "--obs-std", type=float, default=0.05, help="Observation noise scale."
+    )
+    parser.add_argument(
+        "--kl-warmup", type=float, default=1.0, help="Weight for the KL term."
+    )
+    parser.add_argument(
+        "--control-cost-scale",
+        type=float,
+        default=1.0,
+        help="Weight for the control energy penalty.",
+    )
+    parser.add_argument(
+        "--workers", type=int, default=0, help="DataLoader worker processes."
+    )
+    parser.add_argument(
+        "--ckpt-dir",
+        default="cache/checkpoints/vsde",
+        help="Directory for VSDE checkpoints.",
+    )
+    parser.add_argument(
+        "--artifact-dir",
+        default=None,
+        help="Directory for plots/sample bundles (defaults to <ckpt-dir>/artifacts).",
+    )
     parser.add_argument(
         "--device",
         default="auto",
         choices=("auto", "cpu", "cuda", "mps"),
         help="Device to train on (auto selects CUDA/MPS when available).",
     )
-    parser.add_argument("--limit", type=int, default=None, help="Optional cap on samples for quick runs.")
-    parser.add_argument("--cnf-checkpoint", required=True, help="Path to the pretrained CNF checkpoint.")
-    parser.add_argument("--cnf-hidden-dim", type=int, default=128, help="Hidden units used by the CNF backbone.")
-    parser.add_argument("--cnf-depth", type=int, default=3, help="Depth used by the CNF backbone.")
-    parser.add_argument("--context-dim", type=int, default=3, help="Conditioning dimension for the CNF model.")
-    parser.add_argument("--z-dim", type=int, default=2, help="Latent dimensionality for the SDE model.")
-    parser.add_argument("--ctx-dim", type=int, default=128, help="Encoder context dimensionality inside the SDE model.")
-    parser.add_argument("--drift-hidden", type=int, default=128, help="Hidden units for VSDE posterior drift network.")
-    parser.add_argument("--diffusion-learnable", action="store_true", help="Learn the diffusion scale instead of fixing it.")
-    parser.add_argument("--viz-trajectories", type=int, default=16, help="Number of trajectories to visualize in the generated plots.")
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Optional cap on samples for quick runs.",
+    )
+    parser.add_argument(
+        "--cnf-checkpoint", required=True, help="Path to the pretrained CNF checkpoint."
+    )
+    parser.add_argument(
+        "--cnf-hidden-dim",
+        type=int,
+        default=128,
+        help="Hidden units used by the CNF backbone.",
+    )
+    parser.add_argument(
+        "--cnf-depth", type=int, default=3, help="Depth used by the CNF backbone."
+    )
+    parser.add_argument(
+        "--context-dim",
+        type=int,
+        default=3,
+        help="Conditioning dimension for the CNF model.",
+    )
+    parser.add_argument(
+        "--z-dim", type=int, default=2, help="Latent dimensionality for the SDE model."
+    )
+    parser.add_argument(
+        "--ctx-dim",
+        type=int,
+        default=128,
+        help="Encoder context dimensionality inside the SDE model.",
+    )
+    parser.add_argument(
+        "--drift-hidden",
+        type=int,
+        default=128,
+        help="Hidden units for VSDE posterior drift network.",
+    )
+    parser.add_argument(
+        "--diffusion-learnable",
+        action="store_true",
+        help="Learn the diffusion scale instead of fixing it.",
+    )
+    parser.add_argument(
+        "--viz-trajectories",
+        type=int,
+        default=16,
+        help="Number of trajectories to visualize in the generated plots.",
+    )
     return parser.parse_args(argv)
 
 
@@ -78,7 +159,9 @@ def _select_device(preference: str) -> str:
         return preference
     if torch.cuda.is_available():  # pragma: no cover - hardware specific
         return "cuda"
-    if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():  # pragma: no cover - hardware specific
+    if (
+        getattr(torch.backends, "mps", None) and torch.backends.mps.is_available()
+    ):  # pragma: no cover - hardware specific
         return "mps"
     return "cpu"
 
@@ -100,7 +183,11 @@ def _ensure_ckpt_dir(path_like: str) -> Path:
 
 
 def _artifact_dirs(ckpt_dir: Path, artifact_arg: str | None) -> tuple[Path, Path, Path]:
-    base = Path(artifact_arg).expanduser().resolve() if artifact_arg else (ckpt_dir / "artifacts").resolve()
+    base = (
+        Path(artifact_arg).expanduser().resolve()
+        if artifact_arg
+        else (ckpt_dir / "artifacts").resolve()
+    )
     plots = base / "plots"
     bundles = base / "bundles"
     plots.mkdir(parents=True, exist_ok=True)
@@ -118,7 +205,9 @@ def _find_existing_checkpoint(ckpt_dir: Path, preferred_name: str) -> Path | Non
     return None
 
 
-def _prompt_checkpoint_action(console: Console, ckpt_dir: Path, preferred_name: str, label: str) -> bool:
+def _prompt_checkpoint_action(
+    console: Console, ckpt_dir: Path, preferred_name: str, label: str
+) -> bool:
     checkpoint = _find_existing_checkpoint(ckpt_dir, preferred_name)
     if checkpoint is None:
         return False
@@ -126,21 +215,31 @@ def _prompt_checkpoint_action(console: Console, ckpt_dir: Path, preferred_name: 
         f"[yellow]{label} checkpoint already exists at {checkpoint}. You can reuse it or retrain.[/]"
     )
     if not sys.stdin.isatty():
-        console.print("[yellow]Non-interactive session detected; proceeding with retraining.[/]")
+        console.print(
+            "[yellow]Non-interactive session detected; proceeding with retraining.[/]"
+        )
         return False
     with prompt_gate():
         selection = questionary.select(
             f"{label} checkpoint found. What would you like to do?",
             choices=[
-                questionary.Choice(title="Skip step (reuse cached checkpoint)", value="skip"),
-                questionary.Choice(title="Retrain (overwrite checkpoints)", value="retrain"),
+                questionary.Choice(
+                    title="Skip step (reuse cached checkpoint)", value="skip"
+                ),
+                questionary.Choice(
+                    title="Retrain (overwrite checkpoints)", value="retrain"
+                ),
             ],
             default="skip",
         ).ask()
     if selection == "skip":
-        console.print(f"[green]Skipping {label.lower()} training and reusing {checkpoint.name}.")
+        console.print(
+            f"[green]Skipping {label.lower()} training and reusing {checkpoint.name}."
+        )
         return True
-    console.print(f"[cyan]Continuing {label.lower()} training; existing checkpoints may be overwritten.")
+    console.print(
+        f"[cyan]Continuing {label.lower()} training; existing checkpoints may be overwritten."
+    )
     return False
 
 
@@ -177,21 +276,32 @@ def _load_cnf(checkpoint: Path, cond_dim: int, hidden_dim: int, depth: int) -> C
 def _progress_factory(console: Console, *, updates_per_epoch: int = 4):
     state: dict[str, int] = {"epoch": 0, "last_step": 0}
 
-    def _cb(epoch: int, total_epochs: int, step: int, total_steps: int, loss: float, stats: dict | None = None) -> None:
+    def _cb(
+        epoch: int,
+        total_epochs: int,
+        step: int,
+        total_steps: int,
+        loss: float,
+        stats: dict | None = None,
+    ) -> None:
         nonlocal state
         if state["epoch"] != epoch:
             console.print(f"[cyan]Epoch {epoch}/{total_epochs}[/]")
             state["epoch"] = epoch
             state["last_step"] = 0
         interval = max(1, total_steps // max(1, updates_per_epoch))
-        should_log = step == 1 or step == total_steps or (step - state["last_step"]) >= interval
+        should_log = (
+            step == 1 or step == total_steps or (step - state["last_step"]) >= interval
+        )
         if not should_log:
             return
         parts = [f"loss={loss:.4f}"]
         if stats:
             for key, value in stats.items():
                 parts.append(f"{key}={value:.4f}")
-        console.log(f"[epoch {epoch}/{total_epochs} | step {step}/{total_steps}] {' '.join(parts)}")
+        console.log(
+            f"[epoch {epoch}/{total_epochs} | step {step}/{total_steps}] {' '.join(parts)}"
+        )
         state["last_step"] = step
 
     return _cb
@@ -210,7 +320,15 @@ def _sample_dataset_trajectories(dataset, count: int) -> TrajectoryResult:
         trajectories.append(traj)
     stacked = torch.stack(trajectories, dim=1)
     history = stacked.cpu().numpy()
-    times_arr = (times_ref if times_ref is not None else torch.linspace(0.0, 1.0, steps=history.shape[0])).cpu().numpy()
+    times_arr = (
+        (
+            times_ref
+            if times_ref is not None
+            else torch.linspace(0.0, 1.0, steps=history.shape[0])
+        )
+        .cpu()
+        .numpy()
+    )
     return TrajectoryResult(history=history, timesteps=times_arr.tolist())
 
 
@@ -229,9 +347,15 @@ def _render_sample(
     console.print(f"Saved {prefix} visualization to {artifact.path}")
 
 
-def _plot_histories(artifacts: TrainingArtifacts, plots_dir: Path, console: Console) -> None:
+def _plot_histories(
+    artifacts: TrainingArtifacts, plots_dir: Path, console: Console
+) -> None:
     if artifacts.loss_history:
-        loss_art = plot_loss_curve(artifacts.loss_history, plots_dir / "vsde_loss_curve.png", title="VSDE training loss")
+        loss_art = plot_loss_curve(
+            artifacts.loss_history,
+            plots_dir / "vsde_loss_curve.png",
+            title="VSDE training loss",
+        )
         console.print(f"Loss curve written to {loss_art.path}")
     else:
         console.print("[yellow]No VSDE loss history captured; skipping loss plot.[/]")
@@ -244,7 +368,9 @@ def _plot_histories(artifacts: TrainingArtifacts, plots_dir: Path, console: Cons
         )
         console.print(f"Metric grid written to {metric_art.path}")
     except ValueError:
-        console.print("[yellow]VSDE metric history lacked the requested keys; skipping metric grid plot.[/]")
+        console.print(
+            "[yellow]VSDE metric history lacked the requested keys; skipping metric grid plot.[/]"
+        )
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -274,7 +400,9 @@ def main(argv: Sequence[str] | None = None) -> None:
         raise FileNotFoundError(f"CNF checkpoint not found: {ckpt_path}")
 
     console.print(f"Loading CNF checkpoint from {ckpt_path}")
-    cnf_model = _load_cnf(ckpt_path, args.context_dim, args.cnf_hidden_dim, args.cnf_depth)
+    cnf_model = _load_cnf(
+        ckpt_path, args.context_dim, args.cnf_hidden_dim, args.cnf_depth
+    )
     vsde = VariationalSDEModel(
         cnf=cnf_model,
         z_dim=args.z_dim,
@@ -336,7 +464,9 @@ def main(argv: Sequence[str] | None = None) -> None:
             n_integration_steps=args.n_integration_steps,
         )
     generated = traj_out[:, 0, :, :].cpu().numpy()
-    vsde_result = TrajectoryResult(history=generated, timesteps=times_out.cpu().numpy().tolist())
+    vsde_result = TrajectoryResult(
+        history=generated, timesteps=times_out.cpu().numpy().tolist()
+    )
     _render_sample(vsde_result, plots_dir, bundles_dir, "vsde_generated", console)
     console.print(f"Artifacts stored under {artifact_base}")
 

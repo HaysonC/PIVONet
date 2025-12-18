@@ -1,7 +1,7 @@
 """Quick check of checkpoint contents."""
+
 import torch
 import sys
-from pathlib import Path
 
 ckpt = torch.load(sys.argv[1], map_location="cpu")
 print("Keys:", list(ckpt.keys()))

@@ -9,6 +9,8 @@ from typing import Sequence
 
 from rich.console import Console
 from rich.panel import Panel
+from rich.style import Style
+from rich.text import Text
 import questionary
 
 console = Console()
@@ -18,42 +20,84 @@ from .utils.paths import project_root
 from .utils.console_gate import prompt_gate
 
 
-def welcome_message(version: str) -> str:
-    return f"""
-===========================================================
-PIVONet – Physics-Informed Variational ODE Networks
-© 2025 Hayson Cheung, David Lin, Ethan Long
+def welcome_message(version: str) -> Text:
+    banner_lines = [
+        "██████╗ ██╗██╗   ██╗ ██████╗ ",
+        "██╔══██╗██║██║   ██║██╔═══██╗",
+        "██████╔╝██║██║   ██║██║   ██║",
+        "██╔═══╝ ██║╚██╗ ██╔╝██║   ██║",
+        "██║     ██║ ╚████╔╝ ╚██████╔╝",
+        "╚═╝     ╚═╝  ╚═══╝   ╚═════╝ ",
+    ]
+    gradient = [
+        "#C8A2FF",  # lavender
+        "#B7AFFF",
+        "#A6BBFF",
+        "#96C8FF",
+        "#85D4FF",  # light blue peak
+        "#96C8FF",
+        "#A6BBFF",
+        "#B7AFFF",
+        "#C8A2FF",  # back to lavender
+    ]
 
-Version: {version}
-
-PIVONet is an open-source tool for simulating and modeling physical systems using variational ordinary differential equations.
-
-We invite you to explore its capabilities and contribute to its development.
-
-PIVONet uses a dual approach for diffusion-advection simulations: 
-
-  - A CNF model trained via neural ODE techniques for efficient trajectory prediction.
-  - A varieational encoder to model diffusion processes.
-
-We hope that this package empowers a end-to-end pipeline from data ingestion, simulation, evaluation, to visualization.
-===========================================================
-"""
+    text = Text()
+    for line in banner_lines:
+        for idx, char in enumerate(line):
+            color = gradient[idx % len(gradient)]
+            text.append(char, Style(color=color, bold=True))
+        text.append("\n")
+    text.append(
+        "Workflow Orchestrator for  PIVO – Physics-Informed Variational ODE \n",
+        Style(color="cyan", bold=True),
+    )
+    text.append(f"Version: {version}\n", Style(color="bright_cyan"))
+    text.append(
+        "© 2025 Hayson Cheung, David Lin, Ethan Long\n\n", Style(color="grey70")
+    )
+    text.append(
+        "PIVO is an open-source tool for simulating and modeling physical systems using variational ordinary differential equations.\n",
+        Style(color="white"),
+    )
+    text.append(
+        "We invite you to explore its capabilities and contribute to its development.\n",
+        Style(color="white"),
+    )
+    text.append(
+        "PIVO pairs a CNF model for trajectory prediction with a variational encoder for diffusion processes.\n",
+        Style(color="white"),
+    )
+    text.append(
+        "Use it to orchestrate data ingestion, simulation, evaluation, and visualization workflows.\n",
+        Style(color="white"),
+    )
+    return text
 
 
 def _launch_streamlit_app() -> None:
     script = project_root() / "src" / "app" / "ui.py"
     print("Starting the Streamlit UI...")
     try:
-        subprocess.run(["streamlit", "run", str(script)], cwd=project_root(), check=False)
+        subprocess.run(
+            ["streamlit", "run", str(script)], cwd=project_root(), check=False
+        )
     except FileNotFoundError as error:  # pragma: no cover - streaming UI dependency
-        raise RuntimeError("Streamlit is not installed in the current environment.") from error
+        raise RuntimeError(
+            "Streamlit is not installed in the current environment."
+        ) from error
 
 
 def _parse_args(argv: Sequence[str]) -> tuple[argparse.Namespace, list[str]]:
     parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("--gui", action="store_true", help="Launch the graphical Streamlit UI and exit.")
-    parser.add_argument("--cli", action="store_true", help="Launch the conversational CLI (default).")
-    parser.add_argument("--no-banner", action="store_true", help="Suppress the ASCII welcome message.")
+    parser.add_argument(
+        "--gui", action="store_true", help="Launch the graphical Streamlit UI and exit."
+    )
+    parser.add_argument(
+        "--cli", action="store_true", help="Launch the conversational CLI (default)."
+    )
+    parser.add_argument(
+        "--no-banner", action="store_true", help="Suppress the ASCII welcome message."
+    )
     return parser.parse_known_args(argv)
 
 
@@ -69,7 +113,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     parsed, passthrough = _parse_args(raw_args)
     config = load_config()
     if not parsed.no_banner:
-        print(welcome_message(config.version))
+        console.print(welcome_message(config.version))
     if parsed.gui:
         _launch_streamlit_app()
         return
@@ -78,24 +122,31 @@ def main(argv: Sequence[str] | None = None) -> None:
         _run_cli(passthrough)
         return
 
-    with prompt_gate():
-        console.print(
-            Panel(
-                "[bold yellow]Warning:[/bold yellow]\n"
-                "The GUI mode is unstable and experimental. It may lead to crashes or unexpected behavior.\n"
-                "For the safest and most robust experience, choose **CLI**.",
-                border_style="yellow",
+    try:
+        with prompt_gate():
+            console.print(
+                Panel(
+                    "[bold yellow]Warning:[/bold yellow]\n"
+                    "The GUI mode is unstable and experimental. It may lead to crashes or unexpected behavior.\n"
+                    "For the safest and most robust experience, choose **CLI**.",
+                    border_style="yellow",
+                )
             )
-        )
 
-        choice = questionary.select(
-            "Select interface:",
-            choices=[
-                questionary.Choice(title="[CLI] Command-Line (recommended)", value="cli"),
-                questionary.Choice(title="[GUI] Graphical - not recommended", value="gui"),
-            ],
-        ).ask()
-
+            choice = questionary.select(
+                "Select interface:",
+                choices=[
+                    questionary.Choice(
+                        title="[CLI] Command-Line (recommended)", value="cli"
+                    ),
+                    questionary.Choice(
+                        title="[GUI] Graphical - not recommended", value="gui"
+                    ),
+                ],
+            ).ask()
+    except KeyboardInterrupt:
+        console.print("\n[red]Aborted by user.[/red]")
+        sys.exit(0)
 
     if choice == "gui":
         _launch_streamlit_app()

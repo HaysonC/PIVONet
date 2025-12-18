@@ -6,7 +6,7 @@ OVERVIEW
 This package implements Physics-Informed neural ODE architectures for learning
 dynamics of particle trajectories from CFD simulations. Two main approaches:
 
-1. CNF (Continuous Normalizing Flows): 
+1. CNF (Continuous Normalizing Flows):
    Invertible transformations that learn probability densities
    Efficient for generative modeling and likelihood computation
    Uses torchdiffeq for adjoint-method autodiff
@@ -133,7 +133,7 @@ with torch.no_grad():
     z0 = torch.randn(32, 2)  # batch_size=32, dim=2
     context = torch.randn(32, 64)  # trajectory encoding
     tspan = torch.linspace(0, 1, 10)  # integrate 0→1 over 10 steps
-    
+
     z_t, log_prob_diff = model._integrate(z0, context, tspan)
     # z_t: (32, 2) final position
     # log_prob_diff: (32, 1) change in log probability
@@ -154,7 +154,7 @@ CONSTRAINTS & ASSUMPTIONS
 ===================================================================================
 
 1. Batch dimension assumed to be first (B, ...)
-2. Time dimension in CNF not used for training directly; 
+2. Time dimension in CNF not used for training directly;
    integration spans provided by caller
 3. Context vectors should be normalized or scaled appropriately
 4. No in-place operations on model parameters during forward pass

@@ -4,6 +4,7 @@
 Usage:
   python scripts/check_trajectories.py --dir data/axial-compressor/trajectories --verbose
 """
+
 from __future__ import annotations
 
 import argparse
@@ -39,8 +40,12 @@ def check_bundle(path: Path, verbose: bool = False):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--dir", required=True, help="Directory containing .npz trajectory bundles")
-    p.add_argument("--verbose", action="store_true", help="Print samples for bad particles")
+    p.add_argument(
+        "--dir", required=True, help="Directory containing .npz trajectory bundles"
+    )
+    p.add_argument(
+        "--verbose", action="store_true", help="Print samples for bad particles"
+    )
     args = p.parse_args()
 
     d = Path(args.dir)

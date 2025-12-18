@@ -47,10 +47,12 @@ def simulate_trajectory(
     sigma = np.sqrt(2.0 * float(D) * float(dt))
     # Substepping and scheme control for robustness
     substeps = max(1, int(os.environ.get("TFLOW_SUBSTEPS", "1")))
-    scheme = os.environ.get("TFLOW_SDE_SCHEME", "euler").lower()  # "euler" or "milstein"
+    scheme = os.environ.get(
+        "TFLOW_SDE_SCHEME", "euler"
+    ).lower()  # "euler" or "milstein"
 
-    varying = hasattr(flow_fn, 'Hx')
-    Hx_func = getattr(flow_fn, 'Hx') if varying else None
+    varying = hasattr(flow_fn, "Hx")
+    Hx_func = getattr(flow_fn, "Hx") if varying else None
     for t in range(1, int(T) + 1):
         # perform substeps for stability when velocities are large near walls or dt is big
         for _ in range(substeps):
@@ -73,7 +75,9 @@ def simulate_trajectory(
                 x = x + u * dts + noise
             # Reflect only in y-direction at ±H after each substep (with damped overshoot)
             if varying and Hx_func is not None:
-                y_reflected, bounced = reflect_y_variable(x[0], x[1], Hx_func, overshoot_damp=0.2)
+                y_reflected, bounced = reflect_y_variable(
+                    x[0], x[1], Hx_func, overshoot_damp=0.2
+                )
             else:
                 y_reflected, bounced = reflect_y(x[1], H, overshoot_damp=0.2)
             if bounced:
@@ -110,17 +114,25 @@ def simulate_dataset(
         rng = np.random.default_rng()
 
     if x0_sampler is None:
+
         def default_uniform(n: int) -> np.ndarray:
             xs = rng.uniform(0.0, 1.0, size=(n,))
             ys = rng.uniform(-H, H, size=(n,))
             return np.stack([xs, ys], axis=1)
+
         def default_gaussian(n: int) -> np.ndarray:
-            mu = np.array(init_mean if init_mean is not None else [0.0, 0.0], dtype=float)
-            cov = np.array(init_cov if init_cov is not None else [[0.1, 0.0],[0.0, 0.1]], dtype=float)
+            mu = np.array(
+                init_mean if init_mean is not None else [0.0, 0.0], dtype=float
+            )
+            cov = np.array(
+                init_cov if init_cov is not None else [[0.1, 0.0], [0.0, 0.1]],
+                dtype=float,
+            )
             pts = rng.multivariate_normal(mu, cov, size=n)
             # clamp y within bounds to start inside channel
             pts[:, 1] = np.clip(pts[:, 1], -H, H)
             return pts
+
         sampler = default_uniform if init_dist == "uniform" else default_gaussian
     else:
         sampler = x0_sampler
@@ -129,7 +141,11 @@ def simulate_dataset(
     thetas = np.full((num_particles,), theta if theta is not None else 0.0, dtype=float)
     trajs = np.zeros((num_particles, int(T) + 1, 2), dtype=float)
 
-    iterator = range(num_particles) if progress_cb is not None else trange(num_particles, desc="Simulating")
+    iterator = (
+        range(num_particles)
+        if progress_cb is not None
+        else trange(num_particles, desc="Simulating")
+    )
     for i in iterator:
         x0_i = x0s[i]
         _, theta_i, traj_i = simulate_trajectory(flow_fn, x0_i, D, dt, T, H, theta)
@@ -149,10 +165,22 @@ def simulate_dataset(
             "D": D,
             "H": H,
             "init_dist": init_dist,
-            "init_mean": np.array(init_mean, dtype=float) if init_mean is not None else np.array([np.mean(x0s[:,0]), np.mean(x0s[:,1])], dtype=float),
+            "init_mean": np.array(init_mean, dtype=float)
+            if init_mean is not None
+            else np.array([np.mean(x0s[:, 0]), np.mean(x0s[:, 1])], dtype=float),
             "init_cov": np.cov(x0s.T),
         }
         np.savez_compressed(out_path, **meta)
         return out_path
 
-    return {"x0s": x0s, "thetas": thetas, "trajs": trajs, "dt": dt, "D": D, "H": H, "init_dist": init_dist, "init_mean": init_mean, "init_cov": np.cov(x0s.T)}
+    return {
+        "x0s": x0s,
+        "thetas": thetas,
+        "trajs": trajs,
+        "dt": dt,
+        "D": D,
+        "H": H,
+        "init_dist": init_dist,
+        "init_mean": init_mean,
+        "init_cov": np.cov(x0s.T),
+    }

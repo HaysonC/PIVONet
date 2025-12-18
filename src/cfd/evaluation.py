@@ -30,7 +30,9 @@ class ComparisonResult:
         }
 
 
-def compare_final_positions(samples_true: np.ndarray, samples_pred: np.ndarray) -> ComparisonResult:
+def compare_final_positions(
+    samples_true: np.ndarray, samples_pred: np.ndarray
+) -> ComparisonResult:
     """Compare the Gaussian summaries implied by two final-position point clouds."""
 
     true_mean = np.mean(samples_true, axis=0)

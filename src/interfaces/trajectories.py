@@ -18,7 +18,7 @@ class TrajectoryResult:
     @property
     def final_positions(self) -> np.ndarray:
         return self.history[-1]
-    
+
     @property
     def num_particles(self) -> int:
         return self.history.shape[1]

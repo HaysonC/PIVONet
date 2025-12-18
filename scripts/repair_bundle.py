@@ -10,6 +10,7 @@ Usage:
 
 This performs linear interpolation along the time axis for NaN gaps.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -70,7 +71,9 @@ def repair(path: Path, out: Path, drop_fully_bad: bool = True):
         kept_indices.append(i)
 
     if drop_fully_bad and dropped:
-        print(f"Dropped {len(dropped)} fully-bad particles: first indices {dropped[:10]}")
+        print(
+            f"Dropped {len(dropped)} fully-bad particles: first indices {dropped[:10]}"
+        )
         # compact the array to kept indices
         kept_history = new_history[:, kept_indices, :]
     else:
@@ -83,11 +86,15 @@ def repair(path: Path, out: Path, drop_fully_bad: bool = True):
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('bundle', help='Path to .npz bundle to repair')
-    p.add_argument('--out', required=True, help='Output path for repaired bundle')
-    p.add_argument('--keep-bad', action='store_true', help='Keep fully-bad particles instead of dropping')
+    p.add_argument("bundle", help="Path to .npz bundle to repair")
+    p.add_argument("--out", required=True, help="Output path for repaired bundle")
+    p.add_argument(
+        "--keep-bad",
+        action="store_true",
+        help="Keep fully-bad particles instead of dropping",
+    )
     args = p.parse_args()
 
     path = Path(args.bundle)

@@ -4,6 +4,7 @@
 Usage:
   python scripts/inspect_bundle.py data/axial-compressor/trajectories/trajectories_n1024_20251201-030151.npz
 """
+
 from __future__ import annotations
 
 import sys
@@ -25,9 +26,11 @@ def inspect(path: Path, max_show: int = 3):
     finite_mask = np.isfinite(history)
     total = history.size
     finite = np.count_nonzero(finite_mask)
-    print(f"Finite entries: {finite}/{total} ({finite/total:.2%})")
+    print(f"Finite entries: {finite}/{total} ({finite / total:.2%})")
     if finite == 0:
-        print("No finite entries in history; cannot repair automatically. Consider regenerating bundle.")
+        print(
+            "No finite entries in history; cannot repair automatically. Consider regenerating bundle."
+        )
         return 1
 
     # per-particle stats
@@ -47,7 +50,7 @@ def inspect(path: Path, max_show: int = 3):
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     if len(sys.argv) < 2:
         print(__doc__)
         sys.exit(2)

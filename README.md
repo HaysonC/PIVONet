@@ -1,5 +1,10 @@
 # PIVONet: Physics-Informed Variational ODE Networks
 
+![GitHub Last Commit](https://img.shields.io/github/last-commit/HaysonC/ODE_CNF_thermal_motion?style=flat-square)
+![PyTorch 2.9.1](https://img.shields.io/badge/torch-2.9.1-red?style=flat-square)
+![Python 3.10+](https://img.shields.io/badge/python-3.11%2B-377ded?style=flat-square)
+![License](https://img.shields.io/github/license/HaysonC/ODE_CNF_thermal_motion?style=flat-square)
+
 ## Table of Contents
 
 1. [Overview](#overview)
@@ -54,6 +59,7 @@ pip install -e .
 ```
 
 For the interactive 3D viewer (optional):
+
 ```bash
 pip install taichi
 ```
@@ -69,6 +75,7 @@ pivo --run-experiment demo-baseline
 ```
 
 Expected output:
+
 - Simulated particle trajectories saved as `.npz` bundle
 - Console progress indicators with timing
 - Artifact files in `cache/artifacts/` or `cache/checkpoints/`
@@ -211,6 +218,7 @@ pivo
 ```
 
 Menu options:
+
 - **Import Velocities**: Load CFD snapshots, configure particles, simulate
 - **Train Models**: Load trajectory bundle, configure network, train
 - **Visualize Results**: Generate plots, animations, interactive viewer
@@ -305,23 +313,27 @@ pivo --run-experiment my-experiment --overrides particles=500 epochs=200
 **Goal**: Learn invertible transformation of trajectories with tractable likelihood.
 
 **Math**:
+
 - Transform data via ODE: $\frac{dz}{dt} = f_\theta(z, t)$
 - Log-probability change: $\frac{d(\log p)}{dt} = -\text{tr}\left(\frac{\partial f}{\partial z}\right)$
 - Trace computed via Hutchinson estimator: $\text{tr}(J) \approx \epsilon^T \cdot \nabla_z(f \cdot \epsilon)$, where $\epsilon \sim N(0, I)$
 - Loss: $L = -\log p(z_1)$ (averaged over batch)
 
 **Implementation** (`src/networks/cnf.py`):
+
 - `ODEFunc`: Neural network parameterizing $f_\theta$
 - `CNFModel`: Wrapper with integration via `torchdiffeq.odeint_adjoint`
 - Adjoint method reduces memory from $O(n_\text{steps})$ to $O(1)$
 
 **Advantages**:
+
 - Exact likelihood computation
 - Invertible (can reverse trajectories)
 - Memory efficient
 - Theoretically grounded
 
 **Limitations**:
+
 - Deterministic (doesn't capture stochasticity)
 - Sensitive to ODE solver hyperparameters
 
@@ -330,22 +342,26 @@ pivo --run-experiment my-experiment --overrides particles=500 epochs=200
 **Goal**: Learn stochastic dynamics with explicit uncertainty.
 
 **Math**:
+
 - Encoder: $q(z|x) = N(\mu_\phi(x), \sigma^2_\phi(x))$
 - Decoder: $x' = g_\psi(z, t)$
 - Loss: $L = D_\text{KL}(q(z|x) \| p(z)) + \|x - x'\|^2$
 - Reparameterization: $z = \mu + \sigma \cdot \epsilon$, $\epsilon \sim N(0, I)$
 
 **Implementation** (`src/networks/variational_sde.py`):
+
 - Encoder reduces trajectory to latent code
 - Decoder maps latent code → predicted trajectory
 - Beta-annealing schedule for KL weight
 
 **Advantages**:
+
 - Captures aleatoric uncertainty
 - Handles stochastic dynamics
 - Robust to outliers via probabilistic formulation
 
 **Limitations**:
+
 - Assumes Gaussian posteriors (may be restrictive)
 - Larger model size than CNF
 
@@ -353,11 +369,12 @@ pivo --run-experiment my-experiment --overrides particles=500 epochs=200
 
 Three solver options for trajectory integration:
 
-| Solver | Accuracy | Speed | Stability |
-|--------|----------|-------|-----------|
-| **Euler** | O(h) | Fastest | Low (CFL condition) |
-| **RK4** | O(h^4) | Moderate | High |
-| **Scipy Adaptive** | Automatic | Slowest | Highest |
+
+| Solver             | Accuracy  | Speed    | Stability           |
+| ------------------ | --------- | -------- | ------------------- |
+| **Euler**          | O(h)      | Fastest  | Low (CFL condition) |
+| **RK4**            | O(h^4)    | Moderate | High                |
+| **Scipy Adaptive** | Automatic | Slowest  | Highest             |
 
 Selection: Use RK4 by default (good balance); switch to Euler for speed, Adaptive for stiff systems.
 
@@ -503,6 +520,7 @@ ODE_CNF_thermal_motion/
 ```
 
 **Leaf Packages** (with comprehensive `__init__.py` mini-READMEs):
+
 - `src/`
 - `src/app/`
 - `src/cfd/`
@@ -595,20 +613,20 @@ from src.cfd.particle_trajectories import ParticleTrajectorySimulator
 
 class AnalyticalVortexSource(VelocityFieldSource):
     """Analytical 2D vortex velocity field."""
-    
+  
     def query(self, x, y, z=None, t=0.0):
         """Return velocity at (x, y) for 2D vortex."""
         r_sq = x**2 + y**2
         # Avoid singularity at origin
         r_sq = np.maximum(r_sq, 1e-6)
-        
+    
         # Circulation velocity: v_theta = Gamma / (2*pi*r)
         v_theta = 1.0 / (2 * np.pi * np.sqrt(r_sq))
-        
+    
         # Convert to Cartesian
         vx = -v_theta * y / np.sqrt(r_sq)
         vy = v_theta * x / np.sqrt(r_sq)
-        
+    
         return np.stack([vx, vy], axis=-1)
 
 # Use custom source
@@ -639,6 +657,7 @@ python -m src.visualization.viewer_taichi \
 ```
 
 Interactive controls:
+
 - `Space`: Play/pause
 - `Arrow keys`: Rotate camera
 - `Scroll`: Zoom
@@ -654,6 +673,7 @@ Interactive controls:
 **Cause**: `config.yml` missing or incorrect project structure.
 
 **Solution**:
+
 ```bash
 # Verify you're in the correct directory
 ls config.yml  # Should exist in project root
@@ -667,6 +687,7 @@ python -c "from src.utils.paths import project_root; print(project_root())"
 **Cause**: Calling `model._integrate()` without setting context.
 
 **Solution**:
+
 ```python
 model.func.set_context(context_vector)  # Set first
 z_t, log_prob = model._integrate(z0, context, tspan)
@@ -677,6 +698,7 @@ z_t, log_prob = model._integrate(z0, context, tspan)
 **Cause**: Time span too short.
 
 **Solution**:
+
 ```python
 # Use at least 2 time points
 tspan = torch.linspace(0, 1, 10)  # ✓ Good
@@ -688,6 +710,7 @@ tspan = torch.linspace(0, 1, 10)  # ✓ Good
 **Cause**: Batch size too large or model too wide.
 
 **Solutions**:
+
 ```bash
 python -m src.workflows.render_velocity_animations --velocity-dir data/2d-euler-vortex/velocity --output cache/artifacts/2d-euler-vortex/velocity_evolution.gif --save-preview --vector-stride 3 --fps 12 --device auto
 ```
@@ -733,17 +756,18 @@ If you use PIVONet in your research, please cite:
 
 ## Glossary
 
-| Term | Definition |
-|------|-----------|
-| **CNF** | Continuous Normalizing Flow; invertible neural ODE with tractable likelihood |
-| **SDE** | Stochastic Differential Equation; probabilistic dynamical system |
-| **ODE** | Ordinary Differential Equation; deterministic dynamical system |
-| **Adjoint** | Gradient computation via reverse-mode AD; memory-efficient for long trajectories |
-| **Trajectory** | Sequence of positions over time under velocity field |
-| **PyFR** | Open-source CFD solver; simulates fluid flow on unstructured grids |
-| **Langev in** | Stochastic dynamics with friction and noise; models diffusion |
-| **Checkpoint** | Saved model weights and optimizer state for resumption |
-| **YAML** | Human-readable configuration format; used for experiment specifications |
+
+| Term           | Definition                                                                       |
+| -------------- | -------------------------------------------------------------------------------- |
+| **CNF**        | Continuous Normalizing Flow; invertible neural ODE with tractable likelihood     |
+| **SDE**        | Stochastic Differential Equation; probabilistic dynamical system                 |
+| **ODE**        | Ordinary Differential Equation; deterministic dynamical system                   |
+| **Adjoint**    | Gradient computation via reverse-mode AD; memory-efficient for long trajectories |
+| **Trajectory** | Sequence of positions over time under velocity field                             |
+| **PyFR**       | Open-source CFD solver; simulates fluid flow on unstructured grids               |
+| **Langev in**  | Stochastic dynamics with friction and noise; models diffusion                    |
+| **Checkpoint** | Saved model weights and optimizer state for resumption                           |
+| **YAML**       | Human-readable configuration format; used for experiment specifications          |
 
 ---
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterable, List
+from typing import List
 
 import numpy as np
 
@@ -45,7 +45,9 @@ def load_trajectory_bundle(path: str | Path) -> TrajectoryResult:
     if target.suffix == ".npz":
         data = np.load(target, allow_pickle=False)
         history = data["history"]
-        timesteps = data["timesteps"] if "timesteps" in data else np.arange(history.shape[0])
+        timesteps = (
+            data["timesteps"] if "timesteps" in data else np.arange(history.shape[0])
+        )
     elif target.suffix == ".npy":
         history = np.load(target, allow_pickle=False)
         timesteps = np.arange(history.shape[0])

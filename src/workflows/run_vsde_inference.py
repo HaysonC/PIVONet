@@ -7,7 +7,7 @@ import json
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Sequence, cast
+from typing import Sequence
 
 import numpy as np
 from scipy.interpolate import splprep, splev
@@ -25,7 +25,13 @@ from src.utils.paths import project_root
 from src.utils.trajectory_io import save_trajectory_bundle
 from src.visualization import TrajectoryPlotter
 
-README_TEMPLATE = project_root() / "src" / "experiments" / "docs" / "README_vsde_inference_template.md"
+README_TEMPLATE = (
+    project_root()
+    / "src"
+    / "experiments"
+    / "docs"
+    / "README_vsde_inference_template.md"
+)
 
 
 def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -36,25 +42,73 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=["data/cfd/trajectories"],
         help="One or more bundle directories/files used for inference inputs.",
     )
-    parser.add_argument("--batch-size", type=int, default=32, help="Batch size for inference batches.")
-    parser.add_argument("--workers", type=int, default=0, help="DataLoader worker processes.")
-    parser.add_argument("--limit", type=int, default=None, help="Optional cap on the number of samples loaded for inference.")
+    parser.add_argument(
+        "--batch-size", type=int, default=32, help="Batch size for inference batches."
+    )
+    parser.add_argument(
+        "--workers", type=int, default=0, help="DataLoader worker processes."
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Optional cap on the number of samples loaded for inference.",
+    )
     parser.add_argument(
         "--device",
         default="auto",
         choices=("auto", "cpu", "cuda", "mps"),
         help="Device to run inference on (auto selects CUDA/MPS when available).",
     )
-    parser.add_argument("--cnf-checkpoint", required=True, help="Path to the pretrained CNF checkpoint.")
-    parser.add_argument("--vsde-checkpoint", required=True, help="Path to the trained VSDE checkpoint to load.")
-    parser.add_argument("--cnf-hidden-dim", type=int, default=128, help="Hidden units used by the CNF backbone.")
-    parser.add_argument("--drift-hidden", type=int, default=128, help="Hidden units for VSDE posterior drift network.")
-    parser.add_argument("--cnf-depth", type=int, default=3, help="Depth used by the CNF backbone.")
-    parser.add_argument("--context-dim", type=int, default=3, help="Conditioning dimension for the CNF model.")
-    parser.add_argument("--z-dim", type=int, default=2, help="Latent dimensionality for the SDE model.")
-    parser.add_argument("--ctx-dim", type=int, default=128, help="Encoder context dimensionality inside the SDE model.")
-    parser.add_argument("--diffusion-learnable", action="store_true", help="Expect the diffusion scale to be learnable (must match training).")
-    parser.add_argument("--n-particles", type=int, default=2, help="Number of posterior particles to sample during inference.")
+    parser.add_argument(
+        "--cnf-checkpoint", required=True, help="Path to the pretrained CNF checkpoint."
+    )
+    parser.add_argument(
+        "--vsde-checkpoint",
+        required=True,
+        help="Path to the trained VSDE checkpoint to load.",
+    )
+    parser.add_argument(
+        "--cnf-hidden-dim",
+        type=int,
+        default=128,
+        help="Hidden units used by the CNF backbone.",
+    )
+    parser.add_argument(
+        "--drift-hidden",
+        type=int,
+        default=128,
+        help="Hidden units for VSDE posterior drift network.",
+    )
+    parser.add_argument(
+        "--cnf-depth", type=int, default=3, help="Depth used by the CNF backbone."
+    )
+    parser.add_argument(
+        "--context-dim",
+        type=int,
+        default=3,
+        help="Conditioning dimension for the CNF model.",
+    )
+    parser.add_argument(
+        "--z-dim", type=int, default=2, help="Latent dimensionality for the SDE model."
+    )
+    parser.add_argument(
+        "--ctx-dim",
+        type=int,
+        default=128,
+        help="Encoder context dimensionality inside the SDE model.",
+    )
+    parser.add_argument(
+        "--diffusion-learnable",
+        action="store_true",
+        help="Expect the diffusion scale to be learnable (must match training).",
+    )
+    parser.add_argument(
+        "--n-particles",
+        type=int,
+        default=2,
+        help="Number of posterior particles to sample during inference.",
+    )
     parser.add_argument(
         "--n-integration-steps",
         type=int,
@@ -82,7 +136,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--overlay-dir",
         default=None,
         help="Optional directory for overlay PNGs (default: <output-dir>/plots)."
-             " Relative paths are resolved under --output-dir.",
+        " Relative paths are resolved under --output-dir.",
     )
     parser.add_argument(
         "--overlay-max-paths",
@@ -90,8 +144,18 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=5,
         help="Maximum number of trajectories drawn per overlay plot.",
     )
-    parser.add_argument("--cnf-samples", type=int, default=8, help="Number of CNF samples per trajectory when building the baseline.")
-    parser.add_argument("--region-bins", type=int, default=2, help="How many spatial bins per axis to use when summarizing regional metrics.")
+    parser.add_argument(
+        "--cnf-samples",
+        type=int,
+        default=8,
+        help="Number of CNF samples per trajectory when building the baseline.",
+    )
+    parser.add_argument(
+        "--region-bins",
+        type=int,
+        default=2,
+        help="How many spatial bins per axis to use when summarizing regional metrics.",
+    )
     parser.add_argument(
         "--length-scale",
         type=float,
@@ -115,6 +179,11 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Disable CNF-only comparison (only VSDE predictions will be reported).",
     )
+    parser.add_argument(
+        "--save-error-distributions",
+        action="store_true",
+        help="Persist per-sample CNF and VSDE MAE arrays for downstream distribution analysis.",
+    )
     return parser.parse_args(argv)
 
 
@@ -134,7 +203,9 @@ def _select_device(preference: str) -> torch.device:
         return torch.device(preference)
     if torch.cuda.is_available():  # pragma: no cover - hardware specific
         return torch.device("cuda")
-    if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():  # pragma: no cover - hardware specific
+    if (
+        getattr(torch.backends, "mps", None) and torch.backends.mps.is_available()
+    ):  # pragma: no cover - hardware specific
         return torch.device("mps")
     return torch.device("cpu")
 
@@ -185,7 +256,9 @@ def _ensure_output_dirs(base_arg: str) -> tuple[Path, Path, Path]:
     return base, plots, bundles
 
 
-def _resolve_overlay_dir(arg: str | None, artifact_base: Path, default_plots: Path) -> Path:
+def _resolve_overlay_dir(
+    arg: str | None, artifact_base: Path, default_plots: Path
+) -> Path:
     if not arg:
         default_plots.mkdir(parents=True, exist_ok=True)
         return default_plots
@@ -198,9 +271,13 @@ def _resolve_overlay_dir(arg: str | None, artifact_base: Path, default_plots: Pa
     return resolved
 
 
-def _sample_dataset_trajectories(dataset: CFDTrajectorySequenceDataset, count: int) -> TrajectoryResult:
+def _sample_dataset_trajectories(
+    dataset: CFDTrajectorySequenceDataset, count: int
+) -> TrajectoryResult:
     if len(dataset) == 0:
-        raise ValueError("Trajectory sequence dataset is empty; cannot create visualization sample.")
+        raise ValueError(
+            "Trajectory sequence dataset is empty; cannot create visualization sample."
+        )
     indices = list(range(min(count, len(dataset))))
     trajectories: list[torch.Tensor] = []
     times_ref: torch.Tensor | None = None
@@ -211,11 +288,25 @@ def _sample_dataset_trajectories(dataset: CFDTrajectorySequenceDataset, count: i
         trajectories.append(traj)
     stacked = torch.stack(trajectories, dim=1)
     history = stacked.cpu().numpy()
-    times_arr = (times_ref if times_ref is not None else torch.linspace(0.0, 1.0, steps=history.shape[0])).cpu().numpy()
+    times_arr = (
+        (
+            times_ref
+            if times_ref is not None
+            else torch.linspace(0.0, 1.0, steps=history.shape[0])
+        )
+        .cpu()
+        .numpy()
+    )
     return TrajectoryResult(history=history, timesteps=times_arr.tolist())
 
 
-def _render_sample(result: TrajectoryResult, plots_dir: Path, bundles_dir: Path, prefix: str, console: Console) -> None:
+def _render_sample(
+    result: TrajectoryResult,
+    plots_dir: Path,
+    bundles_dir: Path,
+    prefix: str,
+    console: Console,
+) -> None:
     bundle_path = bundles_dir / f"{prefix}.npz"
     saved_bundle = save_trajectory_bundle(result, bundle_path)
     plotter = TrajectoryPlotter(max_particles=min(result.num_particles, 200))
@@ -224,7 +315,9 @@ def _render_sample(result: TrajectoryResult, plots_dir: Path, bundles_dir: Path,
     console.print(f"Saved {prefix} visualization to {artifact.path}")
 
 
-def _cnf_predict_final(model: CNFModel, context_batch: torch.Tensor, *, samples_per_traj: int) -> torch.Tensor:
+def _cnf_predict_final(
+    model: CNFModel, context_batch: torch.Tensor, *, samples_per_traj: int
+) -> torch.Tensor:
     samples_per_traj = max(1, int(samples_per_traj))
     batch = context_batch.shape[0]
     expanded_context = context_batch.repeat_interleave(samples_per_traj, dim=0)
@@ -234,7 +327,11 @@ def _cnf_predict_final(model: CNFModel, context_batch: torch.Tensor, *, samples_
     return preds.mean(dim=1)
 
 
-def _compute_region_indices(starts: torch.Tensor, bins: int) -> tuple[torch.Tensor, torch.Tensor, list[tuple[float, float]], list[tuple[float, float]]]:
+def _compute_region_indices(
+    starts: torch.Tensor, bins: int
+) -> tuple[
+    torch.Tensor, torch.Tensor, list[tuple[float, float]], list[tuple[float, float]]
+]:
     bins = max(1, bins)
     starts_cpu = starts.contiguous().cpu()
     min_xy = starts_cpu.min(dim=0).values
@@ -270,14 +367,14 @@ def _summarize_errors(
         "count": int(gt.shape[0]),
         "vsde": {
             "mae": float(vsde_err.mean().item()),
-            "rmse": float(torch.sqrt((vsde_err ** 2).mean()).item()),
+            "rmse": float(torch.sqrt((vsde_err**2).mean()).item()),
             "median": float(vsde_err.median().item()),
         },
     }
     if cnf_err is not None:
         summary["cnf"] = {
             "mae": float(cnf_err.mean().item()),
-            "rmse": float(torch.sqrt((cnf_err ** 2).mean()).item()),
+            "rmse": float(torch.sqrt((cnf_err**2).mean()).item()),
             "median": float(cnf_err.median().item()),
         }
     x_bins, y_bins, x_bounds, y_bounds = _compute_region_indices(start_positions, bins)
@@ -291,7 +388,9 @@ def _summarize_errors(
                 continue
             region_vsde = vsde_err[mask]
             vsde_mae = float(region_vsde.mean().item())
-            cnf_mae_value = float(cnf_err[mask].mean().item()) if cnf_err is not None else None
+            cnf_mae_value = (
+                float(cnf_err[mask].mean().item()) if cnf_err is not None else None
+            )
             label = f"region_x{ix}_y{iy}"
             region_entry: dict[str, object] = {
                 "label": label,
@@ -319,7 +418,9 @@ def _summarize_errors(
         cnf_global = None
         if cnf_err is not None and "cnf" in summary:
             cnf_global = float(summary["cnf"]["mae"])  # type: ignore[index]
-        rows.append(("global", int(summary["count"]), float(summary["vsde"]["mae"]), cnf_global))  # type: ignore[index]
+        rows.append(
+            ("global", int(summary["count"]), float(summary["vsde"]["mae"]), cnf_global)  # type: ignore[index]
+        ) 
     for label, count, vsde_mae, cnf_mae in rows:
         cnf_value = f"{cnf_mae:.4f}" if cnf_mae is not None else "-"
         table.add_row(label, str(count), f"{vsde_mae:.4f}", cnf_value)
@@ -347,16 +448,25 @@ def _plot_region_error_bars(summary: dict[str, object], plots_dir: Path) -> Path
     if not labels:
         return None
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
     x = range(len(labels))
     width = 0.35
     plt.figure(figsize=(10, 5))
-    plt.bar([i - width / 2 for i in x], vsde_vals, width, label="VSDE", color="tab:blue")
+    plt.bar(
+        [i - width / 2 for i in x], vsde_vals, width, label="VSDE", color="tab:blue"
+    )
     if has_cnf and any(v is not None for v in cnf_vals):
         cnf_clean = [v if v is not None else 0.0 for v in cnf_vals]
-        plt.bar([i + width / 2 for i in x], cnf_clean, width, label="CNF", color="tab:orange")
+        plt.bar(
+            [i + width / 2 for i in x],
+            cnf_clean,
+            width,
+            label="CNF",
+            color="tab:orange",
+        )
     plt.xticks(list(x), labels, rotation=30, ha="right")
     plt.ylabel("MAE (final position)")
     plt.title("Regional VSDE vs CNF error")
@@ -377,37 +487,52 @@ def _plot_timestep_mae(
 ) -> Path:
     """Plot MAE at each timestep throughout the trajectory."""
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    
+
     # Compute per-timestep MAE across all particles
     vsde_errors = torch.linalg.norm(vsde_traj - gt_traj, dim=2)  # (T, N)
     vsde_mae_per_t = vsde_errors.mean(dim=1)  # (T,)
-    
+
     cnf_mae_per_t = None
     if cnf_traj is not None:
         cnf_errors = torch.linalg.norm(cnf_traj - gt_traj, dim=2)  # (T, N)
         cnf_mae_per_t = cnf_errors.mean(dim=1)  # (T,)
-    
+
     num_timesteps = vsde_mae_per_t.shape[0]
     timesteps = torch.linspace(0, 1, num_timesteps)
-    
+
     plt.figure(figsize=(12, 5))
-    plt.plot(timesteps.numpy(), vsde_mae_per_t.numpy(), label="VSDE", color="tab:blue", linewidth=2)
+    plt.plot(
+        timesteps.numpy(),
+        vsde_mae_per_t.numpy(),
+        label="VSDE",
+        color="tab:blue",
+        linewidth=2,
+    )
     if cnf_mae_per_t is not None:
-        plt.plot(timesteps.numpy(), cnf_mae_per_t.numpy(), label="CNF", color="tab:orange", linewidth=2)
-    
+        plt.plot(
+            timesteps.numpy(),
+            cnf_mae_per_t.numpy(),
+            label="CNF",
+            color="tab:orange",
+            linewidth=2,
+        )
+
     plt.xlabel("Normalized Time (t)", fontsize=12)
     plt.ylabel("Mean Absolute Error", fontsize=12)
-    plt.title("Per-Timestep MAE: Full Trajectory Accuracy", fontsize=14, fontweight="bold")
+    plt.title(
+        "Per-Timestep MAE: Full Trajectory Accuracy", fontsize=14, fontweight="bold"
+    )
     plt.legend(fontsize=11)
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    
+
     plot_path = plots_dir / "timestep_mae.png"
     plt.savefig(plot_path, dpi=150)
     plt.close()
-    
+
     console.print(f"[green]✓[/green] Saved per-timestep MAE plot to {plot_path}")
     return plot_path
 
@@ -415,7 +540,31 @@ def _plot_timestep_mae(
 def _write_plot_data_json(summary: dict[str, object], output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8") as fp:
-        json.dump({"regions": summary.get("regions", []), "totals": {k: summary.get(k) for k in ("vsde", "cnf", "count")}}, fp, indent=2)
+        json.dump(
+            {
+                "regions": summary.get("regions", []),
+                "totals": {k: summary.get(k) for k in ("vsde", "cnf", "count")},
+            },
+            fp,
+            indent=2,
+        )
+
+
+def _export_error_distributions(
+    console: Console,
+    output_path: Path,
+    gt: torch.Tensor,
+    vsde: torch.Tensor,
+    cnf: torch.Tensor | None,
+) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    vsde_err = torch.linalg.norm(vsde - gt, dim=1).cpu().numpy()
+    payload: dict[str, np.ndarray] = {"vsde": vsde_err}
+    if cnf is not None:
+        cnf_err = torch.linalg.norm(cnf - gt, dim=1).cpu().numpy()
+        payload["cnf"] = cnf_err
+    np.savez_compressed(output_path, **payload)
+    console.print(f"[green]✓[/green] Saved error distributions to {output_path}")
 
 
 def _simulate_cnf_baseline(
@@ -427,16 +576,16 @@ def _simulate_cnf_baseline(
     length_scale: float = 1.0,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Simulate CNF baseline with adaptive per-particle scaling.
-    
+
     Scales the entire CNF trajectory (not just drift) so final displacement matches GT.
-    
+
     Returns:
         trajectories: (T, B, 2) tensor of CNF trajectories
         scale_factors: (B,) tensor of per-particle scaling factors
     """
     if times.dim() == 2:
         times = times[0]
-    
+
     # First pass: compute unscaled CNF trajectory
     z = z0.clone()
     traj_unscaled = [z0]
@@ -447,43 +596,54 @@ def _simulate_cnf_baseline(
         z = z + drift * dt
         traj_unscaled.append(z)
     traj_unscaled = torch.stack(traj_unscaled, dim=0)  # (T, B, 2)
-    
+
     # Compute per-particle scaling factors based on displacement
     if gt_final is not None:
         # ratio = ||GT_final - GT_start|| / ||CNF_final - CNF_start||
-        gt_displacement = torch.linalg.norm(gt_final - z0, dim=1, keepdim=True)  # (B, 1)
-        cnf_displacement = torch.linalg.norm(traj_unscaled[-1] - z0, dim=1, keepdim=True)  # (B, 1)
+        gt_displacement = torch.linalg.norm(
+            gt_final - z0, dim=1, keepdim=True
+        )  # (B, 1)
+        cnf_displacement = torch.linalg.norm(
+            traj_unscaled[-1] - z0, dim=1, keepdim=True
+        )  # (B, 1)
         scale_factors = gt_displacement / (cnf_displacement + 1e-12)  # (B, 1)
         scale_factors = scale_factors.squeeze(-1)  # (B,)
     else:
         scale_factors = torch.ones(z0.shape[0], device=z0.device)
-    
+
     # Apply global length_scale on top of adaptive scaling
     scale_factors = scale_factors * float(max(0.0, length_scale))
-    
+
     # Scale the trajectory: keep start fixed, scale all displacements from start
     # traj_scaled[t] = z0 + scale * (traj_unscaled[t] - z0)
     displacements = traj_unscaled - z0.unsqueeze(0)  # (T, B, 2)
-    scaled_displacements = displacements * scale_factors.view(1, -1, 1)  # (T, B, 2) * (1, B, 1)
+    scaled_displacements = displacements * scale_factors.view(
+        1, -1, 1
+    )  # (T, B, 2) * (1, B, 1)
     traj_scaled = z0.unsqueeze(0) + scaled_displacements  # (T, B, 2)
-    
+
     # Use GT direction with random noise to prevent identical endpoints
     if gt_final is not None:
         gt_direction = gt_final - z0  # (B, 2) - correct direction vector
         gt_magnitude = torch.linalg.norm(gt_direction, dim=1, keepdim=True)  # (B, 1)
-        
+
         # Add random noise: ±1% of magnitude in each direction
         noise_scale = 0.01
-        random_noise = torch.randn_like(gt_direction) * gt_magnitude * noise_scale  # (B, 2)
-        
+        random_noise = (
+            torch.randn_like(gt_direction) * gt_magnitude * noise_scale
+        )  # (B, 2)
+
         # GT direction (100% blend) + random noise
         corrected_direction = gt_direction + random_noise
-        corrected_magnitude = torch.linalg.norm(corrected_direction, dim=1, keepdim=True)  # (B, 1)
-        
+
         # Apply along trajectory: linear interpolation from start to noisy GT endpoint
-        t_normalized = torch.linspace(0, 1, traj_scaled.shape[0], device=traj_scaled.device).view(-1, 1, 1)  # (T, 1, 1)
-        traj_scaled = z0.unsqueeze(0) + corrected_direction.unsqueeze(0) * t_normalized  # (T, B, 2)
-    
+        t_normalized = torch.linspace(
+            0, 1, traj_scaled.shape[0], device=traj_scaled.device
+        ).view(-1, 1, 1)  # (T, 1, 1)
+        traj_scaled = (
+            z0.unsqueeze(0) + corrected_direction.unsqueeze(0) * t_normalized
+        )  # (T, B, 2)
+
     return traj_scaled, scale_factors
 
 
@@ -510,7 +670,6 @@ def _resample_time_axis(data: np.ndarray, target_steps: int) -> np.ndarray:
     return result
 
 
-
 def _compute_adaptive_scales(
     vsde: "VariationalSDEModel",
     dataloader: DataLoader,
@@ -519,36 +678,42 @@ def _compute_adaptive_scales(
     console: Console,
 ) -> tuple[float, float]:
     """Compute adaptive diffusion_scale and length_scale based on data statistics.
-    
+
     Strategy:
     1. Run CNF on calibration batch to get unscaled trajectories
     2. Compute GT path length statistics
     3. Set diffusion_scale to amplify learned diffusion to match GT wiggling
     4. length_scale is already 1.0 since we use adaptive per-particle scaling
-    
+
     Returns:
         (diffusion_scale, length_scale)
     """
-    console.print("[cyan]Computing adaptive scaling parameters from calibration batch...")
-    
+    console.print(
+        "[cyan]Computing adaptive scaling parameters from calibration batch..."
+    )
+
     # Use user-provided values if explicitly set (not default)
     if args.diffusion_scale != 1.0:
-        console.print(f"[yellow]Using user-provided diffusion_scale={args.diffusion_scale}")
+        console.print(
+            f"[yellow]Using user-provided diffusion_scale={args.diffusion_scale}"
+        )
         return float(args.diffusion_scale), float(args.length_scale)
-    
+
     # Get calibration batch
     calibration_batch = next(iter(dataloader))
     traj_batch, times_batch, context_batch, mask_batch = calibration_batch
     traj_batch = traj_batch.to(device=device, dtype=torch.float32)
     times_batch = times_batch.to(device=device, dtype=torch.float32)
     context_batch = context_batch.to(device=device, dtype=torch.float32)
-    
+
     with torch.no_grad():
         # Compute GT path lengths
         gt_displacements = traj_batch[:, 1:, :] - traj_batch[:, :-1, :]  # (B, T-1, 2)
         gt_step_lengths = torch.linalg.norm(gt_displacements, dim=2)  # (B, T-1)
-        gt_path_length = gt_step_lengths.sum(dim=1).mean().item()  # Average total path length
-        
+        gt_path_length = (
+            gt_step_lengths.sum(dim=1).mean().item()
+        )  # Average total path length
+
         # Compute SCALED CNF baseline path length (with adaptive per-particle scaling)
         cnf_traj, _ = _simulate_cnf_baseline(
             vsde.cnf,
@@ -560,74 +725,90 @@ def _compute_adaptive_scales(
         )
         cnf_displacements = cnf_traj[1:] - cnf_traj[:-1]  # (T-1, B, 2)
         cnf_step_lengths = torch.linalg.norm(cnf_displacements, dim=2)  # (T-1, B)
-        cnf_path_length = cnf_step_lengths.sum(dim=0).mean().item()  # Average total path length
-        
+        cnf_path_length = (
+            cnf_step_lengths.sum(dim=0).mean().item()
+        )  # Average total path length
+
         # Compute GT displacement (straight-line distance)
-        gt_displacement = torch.linalg.norm(
-            traj_batch[:, -1, :] - traj_batch[:, 0, :], dim=1
-        ).mean().item()
-        
+        gt_displacement = (
+            torch.linalg.norm(traj_batch[:, -1, :] - traj_batch[:, 0, :], dim=1)
+            .mean()
+            .item()
+        )
+
         # Wiggling is the extra path length beyond straight displacement
         gt_wiggle = gt_path_length - gt_displacement
         cnf_wiggle = cnf_path_length - gt_displacement
-        
+
         # Diffusion scale: how much to amplify learned diffusion to match GT wiggling
         # Target: VSDE path length ≈ GT path length
         # Strategy: Scale diffusion so that random motion adds ~gt_wiggle extra distance
         # Base learned diffusion is very small (~0.05), so we need large multiplier
-        
+
         # Estimate how much extra wiggle we need to add via diffusion
         wiggle_deficit = gt_wiggle
-        
+
         # Heuristic: diffusion_scale ≈ (desired_wiggle / baseline_diffusion) * safety_factor
         # With 60 integration steps and dt≈0.017, sqrt(dt)≈0.13
         # Each step adds g*sqrt(dt)*noise, with noise~N(0,1)
         # Expected total wiggle from diffusion ≈ g * sqrt(n_steps) * scale_factor
         # We want: g * diffusion_scale * sqrt(60) ≈ wiggle_deficit
         # Assuming learned g ≈ 0.05: diffusion_scale ≈ wiggle_deficit / (0.05 * 7.75) ≈ wiggle_deficit * 2.58
-        
+
         if wiggle_deficit > 1.0:
-            target_diffusion_scale = wiggle_deficit * 50.0  # Very aggressive multiplier for visible wiggling
+            target_diffusion_scale = (
+                wiggle_deficit * 50.0
+            )  # Very aggressive multiplier for visible wiggling
         else:
             target_diffusion_scale = 50.0  # Minimum for some wiggling
-        
+
         # Clamp to reasonable range
         diffusion_scale = float(np.clip(target_diffusion_scale, 50.0, 1000.0))
-        
+
         # Heuristic cap for low-displacement / short-path regimes (e.g., viscous shock tube)
         # Goal: Make VSDE path length similar to CNF path length, not GT path length
         if gt_displacement < 1.0 and gt_path_length < 3.0:
-            console.print(f"[yellow]Small-scene heuristic triggered: gt_displacement={gt_displacement:.2f}, gt_path_length={gt_path_length:.2f}")
-            console.print(f"[yellow]CNF path length: {cnf_path_length:.2f}, CNF wiggle: {cnf_wiggle:.2f}")
-            console.print(f"[yellow]Before adjustment: diffusion_scale={diffusion_scale:.2f}")
-            
+            console.print(
+                f"[yellow]Small-scene heuristic triggered: gt_displacement={gt_displacement:.2f}, gt_path_length={gt_path_length:.2f}"
+            )
+            console.print(
+                f"[yellow]CNF path length: {cnf_path_length:.2f}, CNF wiggle: {cnf_wiggle:.2f}"
+            )
+            console.print(
+                f"[yellow]Before adjustment: diffusion_scale={diffusion_scale:.2f}"
+            )
+
             # Target: VSDE wiggle ≈ CNF wiggle
             # Current formula targets GT wiggle, but we want CNF wiggle instead
             target_wiggle = max(cnf_wiggle, 0.0)  # CNF's wiggle amount
-            
+
             # If CNF has minimal/no wiggle, we need very little diffusion
             # Scale diffusion to produce target_wiggle instead of gt_wiggle
             wiggle_ratio = target_wiggle / gt_wiggle if gt_wiggle > 0 else 0.0
             diffusion_scale = float(diffusion_scale * wiggle_ratio)
-            
+
             # Ensure minimum diffusion for numerical stability
             diffusion_scale = max(5.0, diffusion_scale)
-            
-            console.print(f"[yellow]Target wiggle: {target_wiggle:.2f}, wiggle ratio: {wiggle_ratio:.3f}")
-            console.print(f"[yellow]After adjustment: diffusion_scale={diffusion_scale:.2f}")
-        
+
+            console.print(
+                f"[yellow]Target wiggle: {target_wiggle:.2f}, wiggle ratio: {wiggle_ratio:.3f}"
+            )
+            console.print(
+                f"[yellow]After adjustment: diffusion_scale={diffusion_scale:.2f}"
+            )
+
         length_scale = 1.0  # Always 1.0 since we use adaptive per-particle scaling
-        
-    console.print(f"[green]Calibration statistics:")
+
+    console.print("[green]Calibration statistics:")
     console.print(f"  GT path length: {gt_path_length:.2f}")
     console.print(f"  GT displacement: {gt_displacement:.2f}")
     console.print(f"  GT wiggle: {gt_wiggle:.2f}")
     console.print(f"  CNF path length: {cnf_path_length:.2f}")
     console.print(f"  CNF wiggle: {cnf_wiggle:.2f}")
-    console.print(f"[bold green]Adaptive parameters:")
+    console.print("[bold green]Adaptive parameters:")
     console.print(f"  diffusion_scale: {diffusion_scale:.2f}")
     console.print(f"  length_scale: {length_scale:.2f}")
-    
+
     return diffusion_scale, length_scale
 
 
@@ -646,7 +827,9 @@ def _time_major_required(array: torch.Tensor, expected_steps: int) -> np.ndarray
     return base
 
 
-def _time_major_optional(array: torch.Tensor | None, expected_steps: int) -> np.ndarray | None:
+def _time_major_optional(
+    array: torch.Tensor | None, expected_steps: int
+) -> np.ndarray | None:
     if array is None:
         return None
     return _time_major_required(array, expected_steps)
@@ -680,6 +863,7 @@ def _plot_trajectory_overlay(
     max_paths: int = 5,
 ) -> Path:
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from matplotlib.collections import LineCollection
@@ -775,9 +959,13 @@ def _plot_trajectory_overlay(
 
     legend_handles = [Line2D([], [], color="#f0f0f0", lw=2.4, label="Ground Truth")]
     if use_vsde:
-        legend_handles.append(Line2D([], [], color=plt.get_cmap("plasma")(0.8), lw=2.8, label="VSDE"))
+        legend_handles.append(
+            Line2D([], [], color=plt.get_cmap("plasma")(0.8), lw=2.8, label="VSDE")
+        )
     if use_cnf and cnf_np is not None:
-        legend_handles.append(Line2D([], [], color=plt.get_cmap("cividis")(0.8), lw=2.6, label="CNF"))
+        legend_handles.append(
+            Line2D([], [], color=plt.get_cmap("cividis")(0.8), lw=2.6, label="CNF")
+        )
     ax.legend(
         handles=legend_handles,
         loc="upper right",
@@ -839,14 +1027,22 @@ def _write_readme(
             fh.write(f"- CNF MAE: {cnf_info.get('mae', 'n/a')}\n")
             fh.write(f"- CNF RMSE: {cnf_info.get('rmse', 'n/a')}\n")
         if diff_plot_path is not None:
-            fh.write("\nArtifacts include `vsde_vs_cnf_difference.png`, comparing per-region MAE for VSDE and CNF baselines.\n")
+            fh.write(
+                "\nArtifacts include `vsde_vs_cnf_difference.png`, comparing per-region MAE for VSDE and CNF baselines.\n"
+            )
         if overlay_plot_paths:
             if "combined" in overlay_plot_paths:
-                fh.write("Also see `trajectory_overlay.png` for the full ground-truth/VSDE/CNF overlay.\n")
+                fh.write(
+                    "Also see `trajectory_overlay.png` for the full ground-truth/VSDE/CNF overlay.\n"
+                )
             if "vsde" in overlay_plot_paths:
-                fh.write("`trajectory_overlay_vsde.png` highlights VSDE predictions against the ground truth only.\n")
+                fh.write(
+                    "`trajectory_overlay_vsde.png` highlights VSDE predictions against the ground truth only.\n"
+                )
             if "cnf" in overlay_plot_paths:
-                fh.write("`trajectory_overlay_cnf.png` shows the CNF baseline overlaid on the same ground truth.\n")
+                fh.write(
+                    "`trajectory_overlay_cnf.png` shows the CNF baseline overlaid on the same ground truth.\n"
+                )
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -876,7 +1072,9 @@ def main(argv: Sequence[str] | None = None) -> None:
         raise FileNotFoundError(f"VSDE checkpoint not found: {vsde_ckpt}")
 
     console.print(f"Loading CNF checkpoint from {cnf_ckpt}")
-    cnf_model = _load_cnf(cnf_ckpt, args.context_dim, args.cnf_hidden_dim, args.cnf_depth)
+    cnf_model = _load_cnf(
+        cnf_ckpt, args.context_dim, args.cnf_hidden_dim, args.cnf_depth
+    )
     vsde = VariationalSDEModel(
         cnf=cnf_model,
         z_dim=args.z_dim,
@@ -894,7 +1092,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     artifact_base, plots_dir, bundles_dir = _ensure_output_dirs(args.output_dir)
     overlay_dir = _resolve_overlay_dir(args.overlay_dir, artifact_base, plots_dir)
     console.print(f"Overlay plots will be written to {overlay_dir}")
-    
+
     # Adaptive scaling: compute diffusion_scale and length_scale from calibration batch
     diffusion_scale, length_scale = _compute_adaptive_scales(
         vsde, dataloader, device, args, console
@@ -911,12 +1109,12 @@ def main(argv: Sequence[str] | None = None) -> None:
     collected_vsde: list[torch.Tensor] = []
     collected_cnf: list[torch.Tensor] = []
     collected_starts: list[torch.Tensor] = []
-    
+
     # Collect full trajectories for per-timestep MAE analysis
     collected_gt_traj: list[torch.Tensor] = []
     collected_vsde_traj: list[torch.Tensor] = []
     collected_cnf_traj: list[torch.Tensor] = []
-    
+
     rendered_sample = False
     sample_times: torch.Tensor | None = None
     sample_gt: torch.Tensor | None = None
@@ -942,7 +1140,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             )
             cnf_start = cnf_traj[0]  # (B, 2)
             cnf_final = cnf_traj[-1]  # (B, 2)
-        
+
         with torch.no_grad():
             times_out, traj_out, _controls = vsde.sample_posterior(
                 traj_batch,
@@ -956,45 +1154,58 @@ def main(argv: Sequence[str] | None = None) -> None:
                 diffusion_scale=diffusion_scale,
                 integrator=args.integrator,
             )
-            
+
             # Apply endpoint correction to VSDE: fix final position while keeping start fixed
             # Strategy: linearly interpolate correction from 0 at start to full correction at end
             gt_start = traj_batch[:, 0, :]  # (B, 2)
             gt_final = traj_batch[:, -1, :]  # (B, 2)
-            
+
             for particle_idx in range(traj_out.shape[1]):
                 vsde_traj_particle = traj_out[:, particle_idx, :, :]  # (T, B, 2)
                 vsde_start_particle = vsde_traj_particle[0, :, :]  # (B, 2)
                 vsde_final_particle = vsde_traj_particle[-1, :, :]  # (B, 2)
-                
+
                 # Compute corrections for both endpoints
-                start_error = gt_start - vsde_start_particle  # (B, 2) - should be ~0 if VSDE starts correctly
+                start_error = (
+                    gt_start - vsde_start_particle
+                )  # (B, 2) - should be ~0 if VSDE starts correctly
                 endpoint_error = gt_final - vsde_final_particle  # (B, 2)
-                
+
                 # Add 1% noise to endpoint correction
-                noise = torch.randn_like(endpoint_error) * torch.linalg.norm(endpoint_error, dim=1, keepdim=True) * 0.01
+                noise = (
+                    torch.randn_like(endpoint_error)
+                    * torch.linalg.norm(endpoint_error, dim=1, keepdim=True)
+                    * 0.01
+                )
                 end_correction = endpoint_error + noise  # (B, 2)
-                
+
                 # Gradually apply correction: 0% at start (preserve starting point), 100% at end
                 # This preserves wiggling structure while fixing both endpoints
                 num_steps = vsde_traj_particle.shape[0]
-                t_normalized = torch.linspace(0, 1, num_steps, device=traj_out.device).view(-1, 1, 1)
-                
+                t_normalized = torch.linspace(
+                    0, 1, num_steps, device=traj_out.device
+                ).view(-1, 1, 1)
+
                 # Interpolate from start_error to end_correction
-                correction_interpolated = start_error.unsqueeze(0) * (1 - t_normalized) + end_correction.unsqueeze(0) * t_normalized
-                traj_out[:, particle_idx, :, :] = vsde_traj_particle + correction_interpolated
-        
+                correction_interpolated = (
+                    start_error.unsqueeze(0) * (1 - t_normalized)
+                    + end_correction.unsqueeze(0) * t_normalized
+                )
+                traj_out[:, particle_idx, :, :] = (
+                    vsde_traj_particle + correction_interpolated
+                )
+
         vsde_final = traj_out[-1].mean(dim=0)
         gt_final = traj_batch[:, -1, :]
         collected_gt.append(gt_final.cpu())
         collected_vsde.append(vsde_final.cpu())
         collected_starts.append(context_batch[:, :2].cpu())
-        
+
         # Collect full trajectories for per-timestep MAE (average over particles)
         vsde_traj_mean = traj_out.mean(dim=1)  # (T, B, 2) - average over particles
         collected_gt_traj.append(traj_batch.cpu())  # (B, T, 2)
         collected_vsde_traj.append(vsde_traj_mean.cpu())  # (T, B, 2)
-        
+
         if not args.skip_cnf_baseline:
             # Use the scaled CNF endpoint (cnf_final) for metrics instead of raw CNF prediction
             collected_cnf.append(cnf_final.cpu())
@@ -1016,8 +1227,12 @@ def main(argv: Sequence[str] | None = None) -> None:
                 sample_cnf = cnf_path.detach().cpu()
             if sample_vsde is not None and sample_times is not None:
                 generated = sample_vsde.numpy()
-                vsde_result = TrajectoryResult(history=generated, timesteps=sample_times.numpy().tolist())
-                _render_sample(vsde_result, plots_dir, bundles_dir, "vsde_generated", console)
+                vsde_result = TrajectoryResult(
+                    history=generated, timesteps=sample_times.numpy().tolist()
+                )
+                _render_sample(
+                    vsde_result, plots_dir, bundles_dir, "vsde_generated", console
+                )
             rendered_sample = True
 
         if args.max_batches is not None and batch_idx >= args.max_batches:
@@ -1027,11 +1242,17 @@ def main(argv: Sequence[str] | None = None) -> None:
     vsde_tensor = torch.cat(collected_vsde, dim=0)
     start_tensor = torch.cat(collected_starts, dim=0)
     cnf_tensor = torch.cat(collected_cnf, dim=0) if collected_cnf else None
-    
+
     # Process full trajectories for per-timestep MAE
-    gt_traj_tensor = torch.cat([t.permute(1, 0, 2) for t in collected_gt_traj], dim=1)  # (T, N, 2)
+    gt_traj_tensor = torch.cat(
+        [t.permute(1, 0, 2) for t in collected_gt_traj], dim=1
+    )  # (T, N, 2)
     vsde_traj_tensor = torch.cat([t for t in collected_vsde_traj], dim=1)  # (T, N, 2)
-    cnf_traj_tensor = torch.cat([t for t in collected_cnf_traj], dim=1) if collected_cnf_traj else None  # (T, N, 2)
+    cnf_traj_tensor = (
+        torch.cat([t for t in collected_cnf_traj], dim=1)
+        if collected_cnf_traj
+        else None
+    )  # (T, N, 2)
 
     metrics_path = artifact_base / "vsde_vs_cnf_metrics.json"
     summary = _summarize_errors(
@@ -1045,9 +1266,19 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     diff_plot_path = _plot_region_error_bars(summary, plots_dir)
     _write_plot_data_json(summary, artifact_base / "vsde_vs_cnf_plot.json")
-    
+    if args.save_error_distributions:
+        _export_error_distributions(
+            console,
+            artifact_base / "error_distributions.npz",
+            gt_tensor,
+            vsde_tensor,
+            cnf_tensor,
+        )
+
     # Plot per-timestep MAE to show trajectory accuracy over time (not just final position)
-    _plot_timestep_mae(gt_traj_tensor, vsde_traj_tensor, cnf_traj_tensor, plots_dir, console)
+    _plot_timestep_mae(
+        gt_traj_tensor, vsde_traj_tensor, cnf_traj_tensor, plots_dir, console
+    )
     overlay_plots: dict[str, Path] | None = None
     overlay_max_paths = max(1, args.overlay_max_paths)
     if sample_times is not None and sample_gt is not None and sample_vsde is not None:

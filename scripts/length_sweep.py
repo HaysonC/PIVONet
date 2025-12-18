@@ -1,5 +1,4 @@
 import argparse
-from pathlib import Path
 from typing import List
 
 import torch
@@ -16,16 +15,32 @@ def path_length_torch(traj: torch.Tensor) -> float:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Sweep VSDE length-scale and compare path lengths to GT")
-    parser.add_argument("--bundles", default=str(project_root() / "data/2d-euler-vortex/trajectories"))
-    parser.add_argument("--cnf", default=str(project_root() / "cache/checkpoints/2d-euler-vortex_cnf/cnf_latest.pt"))
-    parser.add_argument("--vsde", default=str(project_root() / "cache/checkpoints/2d-euler-vortex_vsde/vsde_latest.pt"))
+    parser = argparse.ArgumentParser(
+        description="Sweep VSDE length-scale and compare path lengths to GT"
+    )
+    parser.add_argument(
+        "--bundles", default=str(project_root() / "data/2d-euler-vortex/trajectories")
+    )
+    parser.add_argument(
+        "--cnf",
+        default=str(
+            project_root() / "cache/checkpoints/2d-euler-vortex_cnf/cnf_latest.pt"
+        ),
+    )
+    parser.add_argument(
+        "--vsde",
+        default=str(
+            project_root() / "cache/checkpoints/2d-euler-vortex_vsde/vsde_latest.pt"
+        ),
+    )
     parser.add_argument("--scales", nargs="+", type=float, default=[0.6, 0.8, 1.0, 1.2])
     parser.add_argument("--device", default="auto")
     args = parser.parse_args()
 
     dataset = CFDTrajectorySequenceDataset([args.bundles])
-    loader = torch.utils.data.DataLoader(dataset, batch_size=64, shuffle=False, num_workers=0)
+    loader = torch.utils.data.DataLoader(
+        dataset, batch_size=64, shuffle=False, num_workers=0
+    )
     traj_batch, times_batch, context_batch, mask_batch = next(iter(loader))
     device = args.device
     if device == "auto":
@@ -47,7 +62,13 @@ def main() -> None:
     # Load models
     cnf = CNFModel(dim=2, cond_dim=3, hidden_dim=64, depth=3)
     cnf.load_state_dict(torch.load(args.cnf, map_location="cpu"))
-    vsde = VariationalSDEModel(cnf, z_dim=2, ctx_dim=128, drift_hidden=256, diffusion_learnable=True).to(device).eval()
+    vsde = (
+        VariationalSDEModel(
+            cnf, z_dim=2, ctx_dim=128, drift_hidden=256, diffusion_learnable=True
+        )
+        .to(device)
+        .eval()
+    )
     vsde.load_state_dict(torch.load(args.vsde, map_location="cpu"), strict=False)
 
     print(f"GT path length (avg over batch): {gt_len:.6f}")
@@ -55,7 +76,13 @@ def main() -> None:
     with torch.no_grad():
         for s in args.scales:
             times_out, traj_out, _u = vsde.sample_posterior(
-                traj_batch, times_batch, context_batch, mask_batch, n_particles=1, n_integration_steps=60, length_scale=float(s)
+                traj_batch,
+                times_batch,
+                context_batch,
+                mask_batch,
+                n_particles=1,
+                n_integration_steps=60,
+                length_scale=float(s),
             )
             vsde_traj = traj_out[:, 0, :, :]
             vsde_len = path_length_torch(vsde_traj)

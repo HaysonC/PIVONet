@@ -2,6 +2,7 @@
 Run directly or import into a notebook. Prints sample vectors at symmetric y locations
 and asserts inward/outward transverse velocity directions.
 """
+
 from compressor import compressor_flow
 from diffuser import diffuser_flow
 import numpy as np

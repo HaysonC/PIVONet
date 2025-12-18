@@ -14,7 +14,9 @@ from .mlp import MLP
 class FourierTimeEmbedding(nn.Module):
     def __init__(self, emb_dim: int = 32, max_freq: float = 10.0) -> None:
         super().__init__()
-        freqs = torch.exp(torch.linspace(math.log(1.0), math.log(float(max_freq)), emb_dim // 2))
+        freqs = torch.exp(
+            torch.linspace(math.log(1.0), math.log(float(max_freq)), emb_dim // 2)
+        )
         self.register_buffer("freqs", freqs)
 
     def forward(self, t: torch.Tensor) -> torch.Tensor:
@@ -28,14 +30,23 @@ class FourierTimeEmbedding(nn.Module):
 
 
 class TrajectoryEncoder(nn.Module):
-    def __init__(self, x_dim: int = 2, ctx_dim: int = 64, hidden: int = 128, rnn_layers: int = 1) -> None:
+    def __init__(
+        self, x_dim: int = 2, ctx_dim: int = 64, hidden: int = 128, rnn_layers: int = 1
+    ) -> None:
         super().__init__()
         self.time_emb = FourierTimeEmbedding(emb_dim=32)
         self.input_proj = MLP(x_dim + 32, hidden, hidden_dim=hidden, depth=2)
-        self.rnn = nn.GRU(hidden, hidden, num_layers=rnn_layers, batch_first=True, bidirectional=True)
+        self.rnn = nn.GRU(
+            hidden, hidden, num_layers=rnn_layers, batch_first=True, bidirectional=True
+        )
         self.ctx_proj = nn.Linear(2 * hidden, ctx_dim)
 
-    def forward(self, x_seq: torch.Tensor, t_seq: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def forward(
+        self,
+        x_seq: torch.Tensor,
+        t_seq: torch.Tensor,
+        mask: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
         B, T, D = x_seq.shape
         t_emb = self.time_emb(t_seq.reshape(B * T, 1)).reshape(B, T, -1)
         inp = torch.cat([x_seq, t_emb], dim=-1)
@@ -70,7 +81,12 @@ class DiffusionEncoderNet(nn.Module):
         self.encoder = TrajectoryEncoder(ctx_dim=ctx_dim)
         self.posterior = PosteriorInit(ctx_dim, z_dim)
 
-    def forward(self, x_seq: torch.Tensor, t_seq: torch.Tensor, mask: Optional[torch.Tensor] = None) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def forward(
+        self,
+        x_seq: torch.Tensor,
+        t_seq: torch.Tensor,
+        mask: Optional[torch.Tensor] = None,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         ctx = self.encoder(x_seq, t_seq, mask)
         mu, logvar = self.posterior(ctx)
         return ctx, mu, logvar

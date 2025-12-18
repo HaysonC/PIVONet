@@ -42,3 +42,13 @@ cache/
 .*
 
 *.mp4
+
+
+# latex auxiliary files
+*.aux
+*.bbl
+*.blg
+*.idx
+*.ind
+*.lof
+*.lot

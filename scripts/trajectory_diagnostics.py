@@ -1,5 +1,4 @@
 import torch
-import numpy as np
 from pathlib import Path
 
 from src.networks.variational_sde import VariationalSDEModel
@@ -34,12 +33,19 @@ def main() -> None:
 
     traj_batch, times_batch, context_batch, mask_batch = next(iter(dl))
     times_out, traj_out, _ = vsde.sample_posterior(
-        traj_batch.float(), times_batch.float(), context_batch.float(), mask_batch.float(), n_particles=1, n_integration_steps=50
+        traj_batch.float(),
+        times_batch.float(),
+        context_batch.float(),
+        mask_batch.float(),
+        n_particles=1,
+        n_integration_steps=50,
     )
     vsde_traj = traj_out[:, 0, :, :]
 
     # CNF baseline path
-    def simulate_cnf_baseline(cnf_model: CNFModel, z0: torch.Tensor, times: torch.Tensor, ctx: torch.Tensor) -> torch.Tensor:
+    def simulate_cnf_baseline(
+        cnf_model: CNFModel, z0: torch.Tensor, times: torch.Tensor, ctx: torch.Tensor
+    ) -> torch.Tensor:
         if times.dim() == 2:
             times = times[0]
         z = z0
@@ -52,11 +58,14 @@ def main() -> None:
             traj.append(z)
         return torch.stack(traj, dim=0)
 
-    cnf_traj = simulate_cnf_baseline(vsde.cnf, traj_batch[:, 0, :].float(), times_out, context_batch.float())
+    cnf_traj = simulate_cnf_baseline(
+        vsde.cnf, traj_batch[:, 0, :].float(), times_out, context_batch.float()
+    )
 
     print(f"VSDE steps: {vsde_traj.shape[0]} | CNF steps: {cnf_traj.shape[0]}")
     print(f"VSDE path length (avg over batch): {path_length(vsde_traj):.6f}")
     print(f"CNF path length (avg over batch): {path_length(cnf_traj):.6f}")
+
     # Linearity quick check: ratio of net displacement to path length
     def linearity(tr: torch.Tensor) -> float:
         disp = (tr[-1] - tr[0]).norm(dim=-1).mean()

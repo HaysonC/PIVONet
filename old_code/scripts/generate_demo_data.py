@@ -8,6 +8,7 @@ Usage:
     python scripts/generate_demo_data.py --frames 120 --particles 10000
 
 """
+
 from pathlib import Path
 import numpy as np
 import argparse
@@ -42,10 +43,10 @@ def generate(out_dir: Path, frames=120, N=10000):
         cur.tofile(str(path))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--frames', type=int, default=120)
-    parser.add_argument('--particles', type=int, default=10000)
-    parser.add_argument('--out', type=str, default='data/run_demo')
+    parser.add_argument("--frames", type=int, default=120)
+    parser.add_argument("--particles", type=int, default=10000)
+    parser.add_argument("--out", type=str, default="data/run_demo")
     args = parser.parse_args()
     generate(Path(args.out), frames=args.frames, N=args.particles)

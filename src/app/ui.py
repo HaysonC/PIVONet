@@ -7,10 +7,15 @@ from typing import Callable, TypeVar
 
 import streamlit as st
 
-from src.cli.commands import InteractionChannel, run_import, run_velocity, run_visualize, run_modeling
+from src.cli.commands import (
+    InteractionChannel,
+    run_import,
+    run_velocity,
+    run_visualize,
+    run_modeling,
+)
 from src.interfaces.launch_options import LaunchOptions
 from src.utils.load_config import load_config
-from src.utils.modeling import TrainingOutcome
 
 T = TypeVar("T")
 
@@ -63,11 +68,22 @@ class StreamlitChannel(InteractionChannel):
 
 def _render_import_panel(channel: InteractionChannel, config) -> None:
     st.subheader("Import velocity snapshots")
-    st.caption("Simulate particle trajectories using the PyFR velocity snapshots stored in data/.")
+    st.caption(
+        "Simulate particle trajectories using the PyFR velocity snapshots stored in data/."
+    )
     with st.form("import-form"):
-        particles = st.number_input("Particles", min_value=1, step=32, value=config.trajectory_particles)
-        max_steps = st.number_input("Max snapshots (0 = unlimited)", min_value=0, value=0, step=50)
-        dt = st.number_input("Integration timestep (dt)", min_value=0.001, value=config.trajectory_dt, format="%.4f")
+        particles = st.number_input(
+            "Particles", min_value=1, step=32, value=config.trajectory_particles
+        )
+        max_steps = st.number_input(
+            "Max snapshots (0 = unlimited)", min_value=0, value=0, step=50
+        )
+        dt = st.number_input(
+            "Integration timestep (dt)",
+            min_value=0.001,
+            value=config.trajectory_dt,
+            format="%.4f",
+        )
         output_path = st.text_input("Trajectory bundle output path (optional)")
         run_name = st.text_input("Run name (optional)")
         submitted = st.form_submit_button("Simulate import")
@@ -89,10 +105,14 @@ def _render_import_panel(channel: InteractionChannel, config) -> None:
 
 def _render_visualization_panel(channel: InteractionChannel) -> None:
     st.subheader("Trajectory visualization")
-    st.caption("Render one of your saved trajectory bundles into a publication-quality plot.")
+    st.caption(
+        "Render one of your saved trajectory bundles into a publication-quality plot."
+    )
     with st.form("visualize-form"):
         input_path = st.text_input("Trajectory bundle path (.npz/.npy)")
-        max_particles = st.number_input("Max particles to draw", min_value=10, value=200, step=10)
+        max_particles = st.number_input(
+            "Max particles to draw", min_value=10, value=200, step=10
+        )
         output_path = st.text_input("Output image path (optional)")
         flow_overlay = st.checkbox("Overlay velocity field", value=True)
         submitted = st.form_submit_button("Render visualization")
@@ -112,10 +132,14 @@ def _render_visualization_panel(channel: InteractionChannel) -> None:
 
 def _render_velocity_panel(channel: InteractionChannel) -> None:
     st.subheader("Velocity field visualization")
-    st.caption("Sketch velocity snapshots saved as .npy files with an intuitive arrow plot.")
+    st.caption(
+        "Sketch velocity snapshots saved as .npy files with an intuitive arrow plot."
+    )
     with st.form("velocity-form"):
         input_path = st.text_input("Velocity field path (.npy)")
-        sample_amount = st.number_input("Number of velocity samples", min_value=1_000, value=50_000, step=5_000)
+        sample_amount = st.number_input(
+            "Number of velocity samples", min_value=1_000, value=50_000, step=5_000
+        )
         output_path = st.text_input("Output image path (optional)")
         submitted = st.form_submit_button("Render velocity field")
     if submitted:
@@ -133,16 +157,28 @@ def _render_velocity_panel(channel: InteractionChannel) -> None:
 
 def _render_modeling_panel(channel: InteractionChannel) -> None:
     st.subheader("Train hybrid encoder + CNF")
-    st.caption("Fit the variational encoder and CNF on a saved trajectory bundle with custom hyperparameters.")
+    st.caption(
+        "Fit the variational encoder and CNF on a saved trajectory bundle with custom hyperparameters."
+    )
     with st.form("modeling-form"):
         bundle_path = st.text_input("Trajectory bundle path (.npz/.npy)")
         latent_dim = st.number_input("Latent dimension", min_value=2, value=16, step=1)
-        context_dim = st.number_input("Context dimension", min_value=8, value=64, step=4)
-        encoder_steps = st.number_input("Encoder iterations", min_value=1, value=8, step=1)
-        encoder_lr = st.number_input("Encoder learning rate", min_value=1e-6, value=0.001, format="%.6f")
+        context_dim = st.number_input(
+            "Context dimension", min_value=8, value=64, step=4
+        )
+        encoder_steps = st.number_input(
+            "Encoder iterations", min_value=1, value=8, step=1
+        )
+        encoder_lr = st.number_input(
+            "Encoder learning rate", min_value=1e-6, value=0.001, format="%.6f"
+        )
         cnf_steps = st.number_input("CNF iterations", min_value=1, value=6, step=1)
-        cnf_lr = st.number_input("CNF learning rate", min_value=1e-6, value=0.0002, format="%.6f")
-        cnf_hidden = st.number_input("CNF hidden units", min_value=32, value=128, step=8)
+        cnf_lr = st.number_input(
+            "CNF learning rate", min_value=1e-6, value=0.0002, format="%.6f"
+        )
+        cnf_hidden = st.number_input(
+            "CNF hidden units", min_value=32, value=128, step=8
+        )
         run_tag = st.text_input("Run tag (optional)")
         submitted = st.form_submit_button("Train models")
     if submitted:

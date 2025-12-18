@@ -9,7 +9,6 @@ from typing import Iterator, List, Sequence
 
 import numpy as np
 
-from ..utils.paths import resolve_data_path
 
 
 @dataclass(frozen=True)
@@ -23,15 +22,19 @@ class VelocitySnapshot:
 class VelocityFieldSource:
     """Abstract interface for retrieving velocity fields over time."""
 
-    def available_timesteps(self) -> Sequence[float]:  # pragma: no cover - protocol-like behavior
+    def available_timesteps(
+        self,
+    ) -> Sequence[float]:  # pragma: no cover - protocol-like behavior
         raise NotImplementedError
 
-    def iter_velocity_fields(self) -> Iterator[tuple[float, np.ndarray]]:  # pragma: no cover
+    def iter_velocity_fields(
+        self,
+    ) -> Iterator[tuple[float, np.ndarray]]:  # pragma: no cover
         raise NotImplementedError
 
 
 class NpyVelocityFieldSource(VelocityFieldSource):
-    """Velocity field loader that streams ``.npy`` snapshots """
+    """Velocity field loader that streams ``.npy`` snapshots"""
 
     def __init__(self, velocity_dir: str | Path):
         self._velocity_dir = Path(velocity_dir)

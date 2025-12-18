@@ -23,11 +23,27 @@ CLI_COMMANDS = ("import", "visualize", "velocity", "model", "viewer", "experimen
 
 def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="PIVO CLI entry point", add_help=True)
-    parser.add_argument("--run-experiment", metavar="SLUG", help="Run a predefined experiment and exit.")
-    parser.add_argument("--list-experiments", action="store_true", help="List available experiments and exit.")
-    parser.add_argument("--experiments-dir", default=None, help="Override the experiments directory.")
-    parser.add_argument("--dev-mode", action="store_true", help="Enable development shortcuts in the CLI experience.")
-    parser.add_argument("--skip-banner", action="store_true", help="Suppress the startup banner (useful for scripts).")
+    parser.add_argument(
+        "--run-experiment", metavar="SLUG", help="Run a predefined experiment and exit."
+    )
+    parser.add_argument(
+        "--list-experiments",
+        action="store_true",
+        help="List available experiments and exit.",
+    )
+    parser.add_argument(
+        "--experiments-dir", default=None, help="Override the experiments directory."
+    )
+    parser.add_argument(
+        "--dev-mode",
+        action="store_true",
+        help="Enable development shortcuts in the CLI experience.",
+    )
+    parser.add_argument(
+        "--skip-banner",
+        action="store_true",
+        help="Suppress the startup banner (useful for scripts).",
+    )
     parser.add_argument(
         "--progress-mode",
         choices=("auto", "bars", "plain"),
@@ -84,7 +100,9 @@ def _choose_command() -> str | None:
         return questionary.select("What would you like to do?", choices=choices).ask()
 
 
-def _collect_options(command: str, chat: FlowChat, config: SimulationConfig) -> LaunchOptions:
+def _collect_options(
+    command: str, chat: FlowChat, config: SimulationConfig
+) -> LaunchOptions:
     if command == "import":
         return _import_options(chat, config)
     if command == "visualize":
@@ -111,15 +129,19 @@ def _import_options(chat: FlowChat, config: SimulationConfig) -> LaunchOptions:
         allow_blank=True,
     )
     dt = _ask_float(chat, "Integration timestep (dt)", default=config.trajectory_dt)
-    output_path = _ask_path(chat, "Output file path for the trajectory bundle (optional)")
+    output_path = _ask_path(
+        chat, "Output file path for the trajectory bundle (optional)"
+    )
     with prompt_gate():
-        run_name = questionary.text("Optional run name for logging", default="").ask() or ""
-    
+        run_name = (
+            questionary.text("Optional run name for logging", default="").ask() or ""
+        )
+
     assert particles is not None, "I cannot proceed without a particle count."
 
     return LaunchOptions(
         command="import",
-        particles=particles,#
+        particles=particles,  #
         max_steps=max_steps,
         dt=dt,
         diffusion_constant=config.diffusion_constant,
@@ -138,8 +160,10 @@ def _visualize_options(chat: FlowChat) -> LaunchOptions:
     max_particles = _ask_int(chat, "Maximum number of particles to render", default=200)
     output_path = _ask_path(chat, "Optional path to save the visualized plot")
     with prompt_gate():
-        flow_overlay = questionary.confirm("Overlay the velocity flow field?", default=True).ask()
-    
+        flow_overlay = questionary.confirm(
+            "Overlay the velocity flow field?", default=True
+        ).ask()
+
     assert max_particles is not None, "I cannot proceed without a particle count."
 
     return LaunchOptions(
@@ -160,9 +184,9 @@ def _velocity_options(chat: FlowChat) -> LaunchOptions:
     )
     samples = _ask_int(chat, "Number of velocity samples", default=50_000)
     output_path = _ask_path(chat, "Optional path for the velocity visualization")
-    
+
     assert samples is not None, "I cannot proceed without a sample count."
-    
+
     return LaunchOptions(
         command="velocity",
         input_path=input_path,
@@ -186,7 +210,9 @@ def _modeling_options(chat: FlowChat) -> LaunchOptions:
     cnf_lr = _ask_float(chat, "CNF learning rate", default=0.0002)
     cnf_hidden_dim = _ask_int(chat, "CNF hidden units", default=128)
     with prompt_gate():
-        run_tag = questionary.text("Optional run tag for checkpoints", default="").ask() or ""
+        run_tag = (
+            questionary.text("Optional run tag for checkpoints", default="").ask() or ""
+        )
 
     assert latent_dim is not None, "Latent dimension is required."
     assert context_dim is not None, "Context dimensionality is required."
@@ -210,8 +236,10 @@ def _modeling_options(chat: FlowChat) -> LaunchOptions:
 
 def _viewer_options(chat: FlowChat) -> LaunchOptions:
     with prompt_gate():
-        dataset = questionary.text("Dataset name (folder under ./data)", default="run_demo").ask()
-    
+        dataset = questionary.text(
+            "Dataset name (folder under ./data)", default="run_demo"
+        ).ask()
+
     assert dataset, "Dataset name is required."
 
     return LaunchOptions(
@@ -263,7 +291,13 @@ def _ask_float(chat: FlowChat, prompt: str, *, default: float) -> float:
             chat.say("Please enter a valid number (decimal allowed).")
 
 
-def _ask_path(chat: FlowChat, prompt: str, *, required: bool = False, default_key: str | None = None) -> Path | None:
+def _ask_path(
+    chat: FlowChat,
+    prompt: str,
+    *,
+    required: bool = False,
+    default_key: str | None = None,
+) -> Path | None:
     default_value = chat.default_path(default_key) if default_key else None
     default_text = default_value.as_posix() if default_value else ""
     while True:
@@ -291,7 +325,9 @@ def _ask_path(chat: FlowChat, prompt: str, *, required: bool = False, default_ke
 def _handle_experiment_cli(args: argparse.Namespace, progress_mode: str | None) -> bool:
     if not (args.list_experiments or args.run_experiment):
         return False
-    experiments_dir = Path(args.experiments_dir).expanduser() if args.experiments_dir else None
+    experiments_dir = (
+        Path(args.experiments_dir).expanduser() if args.experiments_dir else None
+    )
     orchestrator = ExperimentOrchestrator(
         experiments_dir=experiments_dir,
         progress_mode=progress_mode,
@@ -328,16 +364,22 @@ def _run_experiment_menu(chat: FlowChat, progress_mode: str | None) -> None:
     ]
     choices.append(questionary.Choice(title="Back", value=None))
     with prompt_gate():
-        selection = questionary.select("Select an experiment to run", choices=choices).ask()
+        selection = questionary.select(
+            "Select an experiment to run", choices=choices
+        ).ask()
     # Some terminals / questionary backends may return the title string for the
     # "Back" choice even when its explicit value was set to None. Guard against
     # that by treating any falsy selection or the literal title as a cancel.
     if not selection or selection == "Back":
         return
-    chat.say(f"Launching experiment '{selection}'. Live logs will appear below; previous menu saved for later.")
+    chat.say(
+        f"Launching experiment '{selection}'. Live logs will appear below; previous menu saved for later."
+    )
     chat.console.print("\n" * 2)
     orchestrator.run(selection)
-    chat.console.print("\n[dim]Returning to the experiment menu. You can select another run or exit.[/]\n")
+    chat.console.print(
+        "\n[dim]Returning to the experiment menu. You can select another run or exit.[/]\n"
+    )
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -352,7 +394,9 @@ def main(argv: Sequence[str] | None = None) -> None:
         print("PIVO experiment CLI — type --help for automation options.\n")
         input("Press Enter to continue...")
 
-    run_conversational_cli(config, dev_mode=args.dev_mode, progress_mode=preferred_progress)
+    run_conversational_cli(
+        config, dev_mode=args.dev_mode, progress_mode=preferred_progress
+    )
 
 
 def _configure_progress_mode(choice: str | None) -> str | None:

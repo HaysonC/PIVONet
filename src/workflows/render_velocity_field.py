@@ -24,12 +24,29 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default="cache/artifacts/velocity_plots/velocity_phase.png",
         help="Where to store the rendered figure (PNG).",
     )
-    parser.add_argument("--samples", type=int, default=50_000, help="Velocity samples to draw for the scatter plot.")
-    parser.add_argument("--cmap", default="viridis", help="Matplotlib colormap for the magnitude shading.")
-    parser.add_argument("--fig-width", type=float, default=8.0, help="Figure width in inches.")
-    parser.add_argument("--fig-height", type=float, default=4.5, help="Figure height in inches.")
-    parser.add_argument("--seed", type=int, default=7, help="RNG seed for subsampling (optional).")
-    parser.add_argument("--title", default=None, help="Optional title override for the scatter panel.")
+    parser.add_argument(
+        "--samples",
+        type=int,
+        default=50_000,
+        help="Velocity samples to draw for the scatter plot.",
+    )
+    parser.add_argument(
+        "--cmap",
+        default="viridis",
+        help="Matplotlib colormap for the magnitude shading.",
+    )
+    parser.add_argument(
+        "--fig-width", type=float, default=8.0, help="Figure width in inches."
+    )
+    parser.add_argument(
+        "--fig-height", type=float, default=4.5, help="Figure height in inches."
+    )
+    parser.add_argument(
+        "--seed", type=int, default=7, help="RNG seed for subsampling (optional)."
+    )
+    parser.add_argument(
+        "--title", default=None, help="Optional title override for the scatter panel."
+    )
     parser.add_argument(
         "--fallback-dir",
         default="data/cfd/npy/velocity",
@@ -60,7 +77,9 @@ def _collect_latest_snapshots(root: Path) -> list[Path]:
     return sorted(candidates, key=lambda p: p.stat().st_mtime, reverse=True)
 
 
-def _discover_snapshot(primary: Path, fallback_dir: Path, *, allow_missing: bool, console: Console) -> Path | None:
+def _discover_snapshot(
+    primary: Path, fallback_dir: Path, *, allow_missing: bool, console: Console
+) -> Path | None:
     candidates: list[Path] = []
     if primary.exists():
         candidates.extend(_collect_latest_snapshots(primary))
@@ -69,7 +88,9 @@ def _discover_snapshot(primary: Path, fallback_dir: Path, *, allow_missing: bool
         pattern = primary.name
         if pattern and parent.exists():
             matches = [p for p in parent.glob(pattern) if p.is_file()]
-            candidates.extend(sorted(matches, key=lambda p: p.stat().st_mtime, reverse=True))
+            candidates.extend(
+                sorted(matches, key=lambda p: p.stat().st_mtime, reverse=True)
+            )
     if not candidates:
         candidates.extend(_collect_latest_snapshots(fallback_dir))
     if candidates:
@@ -96,11 +117,19 @@ def main(argv: Sequence[str] | None = None) -> None:
         figsize=(args.fig_width, args.fig_height),
         random_seed=args.seed,
     )
-    fallback_dir = _resolve_path(args.fallback_dir) if args.fallback_dir else _resolve_path("data/cfd/npy/velocity")
-    snapshot = _discover_snapshot(velocity_path, fallback_dir, allow_missing=args.allow_missing, console=console)
+    fallback_dir = (
+        _resolve_path(args.fallback_dir)
+        if args.fallback_dir
+        else _resolve_path("data/cfd/npy/velocity")
+    )
+    snapshot = _discover_snapshot(
+        velocity_path, fallback_dir, allow_missing=args.allow_missing, console=console
+    )
     if snapshot is None:
         return
-    artifact = plotter.plot_from_file(snapshot, output_path=output_path, show=False, title=args.title)
+    artifact = plotter.plot_from_file(
+        snapshot, output_path=output_path, show=False, title=args.title
+    )
     console.print(f"Velocity plot saved to {artifact.path}")
 
 

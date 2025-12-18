@@ -93,7 +93,7 @@ Example: Adding custom velocity source
 
     from src.interfaces.data_sources import VelocityFieldSource
     import numpy as np
-    
+
     class CustomVelocitySource(VelocityFieldSource):
         def query(self, x, y, z=None, t=0.0):
             \"\"\"Return velocity at (x, y[, z]) at time t.\"\"\"
@@ -163,7 +163,7 @@ Example:
     class ModelingConfig:
         hidden_dim: int = 64
         depth: int = 3
-        
+
         def __post_init__(self):
             if self.hidden_dim < 1:
                 raise ValueError(f"hidden_dim must be positive, got {self.hidden_dim}")
@@ -183,13 +183,13 @@ from .visualization import PlotArtifact, TrajectoryVisualizer
 from .modeling import ModelingConfig
 
 __all__ = [
-	"SimulationConfig",
-	"VelocityFieldSource",
-	"NpyVelocityFieldSource",
-	"TrajectoryResult",
-	"TrajectoryVisualizer",
-	"PlotArtifact",
-	"ModelingConfig",
+    "SimulationConfig",
+    "VelocityFieldSource",
+    "NpyVelocityFieldSource",
+    "TrajectoryResult",
+    "TrajectoryVisualizer",
+    "PlotArtifact",
+    "ModelingConfig",
 ]
-# This directory contains interface definitions for various components 
+# This directory contains interface definitions for various components
 # It controls how top level parts for each module interact and understand each other

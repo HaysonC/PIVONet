@@ -41,10 +41,12 @@ class LaunchOptions:
         short = f"flow-cli {self.command}"
         args = []
         if self.command == "import":
-            args.extend([
-                f"--particles {self.particles}",
-                f"--dt {self.dt}",
-            ])
+            args.extend(
+                [
+                    f"--particles {self.particles}",
+                    f"--dt {self.dt}",
+                ]
+            )
             if self.max_steps:
                 args.append(f"--steps {self.max_steps}")
             if self.run_name:
@@ -58,15 +60,17 @@ class LaunchOptions:
         if self.command == "viewer" and self.viewer_dataset:
             args.append(f"--dataset {self.viewer_dataset}")
         if self.command == "model":
-            args.extend([
-                f"--latent {self.encoder_latent_dim}",
-                f"--context {self.encoder_context_dim}",
-                f"--enc-steps {self.encoder_steps}",
-                f"--enc-lr {self.encoder_lr}",
-                f"--cnf-steps {self.cnf_steps}",
-                f"--cnf-lr {self.cnf_lr}",
-                f"--cnf-hidden {self.cnf_hidden_dim}",
-            ])
+            args.extend(
+                [
+                    f"--latent {self.encoder_latent_dim}",
+                    f"--context {self.encoder_context_dim}",
+                    f"--enc-steps {self.encoder_steps}",
+                    f"--enc-lr {self.encoder_lr}",
+                    f"--cnf-steps {self.cnf_steps}",
+                    f"--cnf-lr {self.cnf_lr}",
+                    f"--cnf-hidden {self.cnf_hidden_dim}",
+                ]
+            )
         args.extend(self.extra_flags)
         return " ".join([short, *args])
 

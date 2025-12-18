@@ -32,17 +32,30 @@ class CNFTrainingState:
 class DiffusionEncoder:
     """Variational encoder that summarizes trajectories into a latent context vector."""
 
-    def __init__(self, cache_dir: Path, latent_dim: int = 16, context_dim: int = 64, lr: float = 1e-3, steps: int = 8) -> None:
+    def __init__(
+        self,
+        cache_dir: Path,
+        latent_dim: int = 16,
+        context_dim: int = 64,
+        lr: float = 1e-3,
+        steps: int = 8,
+    ) -> None:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.net = DiffusionEncoderNet(z_dim=latent_dim, ctx_dim=context_dim).to(self.device)
+        self.net = DiffusionEncoderNet(z_dim=latent_dim, ctx_dim=context_dim).to(
+            self.device
+        )
         self.optimizer = optim.Adam(self.net.parameters(), lr=lr)
         self.cache_dir = cache_dir
         self.steps = max(steps, 1)
 
-    def _build_dataset(self, trajectory: TrajectoryResult) -> tuple[torch.Tensor, torch.Tensor]:
+    def _build_dataset(
+        self, trajectory: TrajectoryResult
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         history = torch.from_numpy(trajectory.history).float().to(self.device)
         sequence = history.permute(1, 0, 2)
-        time_grid = torch.linspace(0.0, 1.0, steps=sequence.shape[1], device=self.device)
+        time_grid = torch.linspace(
+            0.0, 1.0, steps=sequence.shape[1], device=self.device
+        )
         return sequence, time_grid
 
     def _kl_loss(self, mu: torch.Tensor, logvar: torch.Tensor) -> torch.Tensor:
@@ -53,7 +66,9 @@ class DiffusionEncoder:
         batch_size = sequence.shape[0]
         time_batch = time_grid.unsqueeze(0).expand(batch_size, -1)
         loss = torch.tensor(0.0, device=self.device)
-        context = torch.zeros(batch_size, self.net.encoder.ctx_proj.out_features, device=self.device)
+        context = torch.zeros(
+            batch_size, self.net.encoder.ctx_proj.out_features, device=self.device
+        )
         for _ in range(self.steps):
             self.optimizer.zero_grad()
             context, mu, logvar = self.net(sequence, time_batch)
@@ -62,21 +77,36 @@ class DiffusionEncoder:
             self.optimizer.step()
         state_path = self.cache_dir / "encoder.pt"
         torch.save(self.net.state_dict(), state_path)
-        return EncoderTrainingState(loss=loss.item(), context=context.detach().cpu(), state_path=state_path)
+        return EncoderTrainingState(
+            loss=loss.item(), context=context.detach().cpu(), state_path=state_path
+        )
 
 
 class TrajectoryCNF:
     """CNF that learns the advection dynamics of particle endpoints."""
 
-    def __init__(self, cache_dir: Path, cond_dim: int = 64, hidden_dim: int = 128, lr: float = 2e-4, steps: int = 6) -> None:
+    def __init__(
+        self,
+        cache_dir: Path,
+        cond_dim: int = 64,
+        hidden_dim: int = 128,
+        lr: float = 2e-4,
+        steps: int = 6,
+    ) -> None:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model = CNFModel(dim=2, cond_dim=cond_dim, hidden_dim=hidden_dim).to(self.device)
+        self.model = CNFModel(dim=2, cond_dim=cond_dim, hidden_dim=hidden_dim).to(
+            self.device
+        )
         self.optimizer = optim.Adam(self.model.parameters(), lr=lr)
         self.cache_dir = cache_dir
         self.steps = max(steps, 1)
 
-    def train(self, trajectory: TrajectoryResult, context: torch.Tensor) -> CNFTrainingState:
-        final_positions = torch.from_numpy(trajectory.history[-1]).float().to(self.device)
+    def train(
+        self, trajectory: TrajectoryResult, context: torch.Tensor
+    ) -> CNFTrainingState:
+        final_positions = (
+            torch.from_numpy(trajectory.history[-1]).float().to(self.device)
+        )
         context = context.to(self.device)
         loss = torch.tensor(0.0, device=self.device)
         for _ in range(self.steps):

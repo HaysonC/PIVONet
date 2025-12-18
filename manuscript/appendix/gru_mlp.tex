@@ -1,0 +1,18 @@
+\section{Gated Recurrent Unit and Multi-Layer Perceptron}\label{apx:gru_mlp}
+This appendix provides a brief overview of the Gated Recurrent Unit (GRU) and Multi-Layer Perceptron (MLP) architectures used in our model.
+
+\subsection{Neural Networks}
+Neural networks are computational models inspired by the human brain, consisting of layers of interconnected nodes (neurons) that process input data to learn complex patterns and representations. They are widely used in machine learning tasks such as classification, regression, and generative modeling.
+
+Neural networks are `trained' using optimization algorithms like gradient descent, which adjust the weights of the connections between neurons to minimize a loss function that quantifies the difference between predicted and true outputs.
+
+Feedforward neural networks, such as MLPs, pass data in one direction from input to output, while recurrent neural networks (RNNs), like GRUs, have connections that form cycles, allowing them to maintain a hidden state and capture temporal dependencies in sequential data.
+\subsection{Multi-Layer Perceptron (MLP)}
+A Multi-Layer Perceptron (MLP) is a type of feedforward neural network composed of multiple layers of neurons, including an input layer, one or more hidden layers, and an output layer. Each neuron in a layer is connected to every neuron in the subsequent layer, and each connection has an associated weight. The MLP processes input data by performing a series of linear transformations followed by nonlinear activation functions, enabling it to learn complex mappings from inputs to outputs. MLPs are commonly used for tasks such as regression, classification, and function approximation due to their ability to model non-linear relationships.
+
+\subsection{Recurrent Neural Networks (RNNs)}
+Recurrent Neural Networks (RNNs) are a class of neural networks designed to handle sequential data by maintaining a hidden state that captures information from previous time steps. This allows RNNs to model temporal dependencies and patterns in sequences, making them suitable for tasks such as language modeling, time series prediction, and speech recognition. However, standard RNNs can suffer from issues like vanishing and exploding gradients, which can hinder their ability to learn long-term dependencies.
+
+\subsection{Gated Recurrent Unit (GRU)}
+The Gated Recurrent Unit (GRU) is a type of RNN that addresses some of the limitations of standard RNNs by introducing gating mechanisms to control the flow of information. GRUs have two main gates: the update gate and the reset gate. The update gate determines how much of the previous hidden state should be retained, while the reset gate controls how much of the past information to forget. These gates help the GRU maintain long-term dependencies and mitigate the vanishing gradient problem. GRUs are computationally efficient and have been shown to perform well on various sequence modeling tasks, making them a popular choice for applications involving time series and sequential data.
+

@@ -202,7 +202,9 @@ def _humanize_slug(slug: str) -> str:
     tokens = slug.replace("_", " ").replace("-", " ").split()
     if not tokens:
         return slug
-    return " ".join(token if token.isupper() else token.capitalize() for token in tokens)
+    return " ".join(
+        token if token.isupper() else token.capitalize() for token in tokens
+    )
 
 
 def _format_title(args: argparse.Namespace, slug: str) -> str:
@@ -225,10 +227,14 @@ def _resolve_device_choice(console: Console, requested: str) -> str:
         prefer_mps = True
     if not _TORCH_AVAILABLE:
         if device != "cpu":
-            console.print("[yellow]PyTorch is not installed; falling back to CPU for magnitude calculations.[/]")
+            console.print(
+                "[yellow]PyTorch is not installed; falling back to CPU for magnitude calculations.[/]"
+            )
         return "cpu"
     assert torch is not None
-    if prefer_mps and torch.backends.mps.is_available():  # pragma: no cover - hardware specific
+    if (
+        prefer_mps and torch.backends.mps.is_available()
+    ):  # pragma: no cover - hardware specific
         console.print("[green]Using Apple MPS backend for magnitude calculations.[/]")
         return "mps"
     if device == "mps":
@@ -260,7 +266,9 @@ def _sanitize_field(field: np.ndarray) -> np.ndarray:
     array = np.asarray(field, dtype=np.float32)
     if array.ndim == 1:
         if array.size % 2 != 0:
-            raise ValueError("Velocity array with odd length cannot be reshaped into 2D vectors.")
+            raise ValueError(
+                "Velocity array with odd length cannot be reshaped into 2D vectors."
+            )
         array = array.reshape(-1, 2)
     if array.ndim != 2 or array.shape[1] < 2:
         raise ValueError("Velocity field must be shape (N, >=2)")
@@ -535,7 +543,9 @@ def _animate_phase_space(
     ax.tick_params(colors="white")
     ax.set_xlabel("vx", color="white")
     ax.set_ylabel("vy", color="white")
-    title_text = ax.set_title(f"{title} (phase space)\n t = {timesteps[0]:.2f}", color="white")
+    title_text = ax.set_title(
+        f"{title} (phase space)\n t = {timesteps[0]:.2f}", color="white"
+    )
     scatter = ax.scatter(
         planar_fields[0][:, 0],
         planar_fields[0][:, 1],
@@ -551,7 +561,7 @@ def _animate_phase_space(
         scatter.set_offsets(planar_fields[frame_index][:, :2])
         scatter.set_array(mags[frame_index])
         title_text.set_text(f"{title} (phase space)\n t = {timesteps[frame_index]:.2f}")
-        return scatter,
+        return (scatter,)
 
     interval_ms = max(1, int(1000 / max(1, fps)))
     anim = animation.FuncAnimation(
@@ -678,7 +688,7 @@ def _build_jobs(args: argparse.Namespace, *, console: Console) -> list[FlowJob]:
         slug = _infer_flow_slug(directory)
         counter = seen.get(slug, 0)
         seen[slug] = counter + 1
-        unique_slug = slug if counter == 0 else f"{slug}-{counter+1}"
+        unique_slug = slug if counter == 0 else f"{slug}-{counter + 1}"
         out_dir = output_root / unique_slug
         output_path = out_dir / DEFAULT_OUTPUT_NAME
         preview_path = out_dir / DEFAULT_PREVIEW_NAME if args.save_preview else None
@@ -742,7 +752,9 @@ def _process_flow(
         frame_stride=args.frame_stride,
     )
     if not raw_fields:
-        console.print(f"[red]No velocity snapshots were loaded from {job.velocity_dir}.[/]")
+        console.print(
+            f"[red]No velocity snapshots were loaded from {job.velocity_dir}.[/]"
+        )
         return
 
     planar_fields = [_sanitize_field(field) for field in raw_fields]

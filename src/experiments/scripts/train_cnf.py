@@ -14,7 +14,15 @@ from typing import Sequence
 import torch
 import questionary
 from rich.console import Console
-from rich.progress import BarColumn, Progress, TaskID, TaskProgressColumn, TextColumn, TimeElapsedColumn, TimeRemainingColumn
+from rich.progress import (
+    BarColumn,
+    Progress,
+    TaskID,
+    TaskProgressColumn,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+)
 from torch.utils.data import DataLoader, Subset, random_split
 
 from src.interfaces.trajectories import TrajectoryResult
@@ -34,26 +42,79 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=["data/cfd/trajectories"],
         help="One or more bundle directories/files to use for training.",
     )
-    parser.add_argument("--batch-size", type=int, default=128, help="Batch size for the endpoint dataset.")
-    parser.add_argument("--epochs", type=int, default=5, help="Number of training epochs for the CNF model.")
-    parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate for AdamW.")
-    parser.add_argument("--hidden-dim", type=int, default=128, help="Hidden units inside the CNF MLP.")
-    parser.add_argument("--depth", type=int, default=3, help="Number of residual blocks in the CNF MLP.")
-    parser.add_argument("--context-dim", type=int, default=3, help="Context dimensionality emitted by the dataset.")
-    parser.add_argument("--workers", type=int, default=0, help="DataLoader worker processes.")
-    parser.add_argument("--ckpt-dir", default="cache/checkpoints/cnf", help="Directory to store CNF checkpoints.")
-    parser.add_argument("--artifact-dir", default=None, help="Directory for plots and sample bundles (defaults to <ckpt-dir>/artifacts).")
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=128,
+        help="Batch size for the endpoint dataset.",
+    )
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=5,
+        help="Number of training epochs for the CNF model.",
+    )
+    parser.add_argument(
+        "--lr", type=float, default=1e-3, help="Learning rate for AdamW."
+    )
+    parser.add_argument(
+        "--hidden-dim", type=int, default=128, help="Hidden units inside the CNF MLP."
+    )
+    parser.add_argument(
+        "--depth", type=int, default=3, help="Number of residual blocks in the CNF MLP."
+    )
+    parser.add_argument(
+        "--context-dim",
+        type=int,
+        default=3,
+        help="Context dimensionality emitted by the dataset.",
+    )
+    parser.add_argument(
+        "--workers", type=int, default=0, help="DataLoader worker processes."
+    )
+    parser.add_argument(
+        "--ckpt-dir",
+        default="cache/checkpoints/cnf",
+        help="Directory to store CNF checkpoints.",
+    )
+    parser.add_argument(
+        "--artifact-dir",
+        default=None,
+        help="Directory for plots and sample bundles (defaults to <ckpt-dir>/artifacts).",
+    )
     parser.add_argument(
         "--device",
         default="auto",
         choices=("auto", "cpu", "cuda", "mps"),
         help="Device to train on (auto selects CUDA/MPS when available).",
     )
-    parser.add_argument("--limit", type=int, default=None, help="Optional cap on the number of samples for fast runs.")
-    parser.add_argument("--viz-trajectories", type=int, default=32, help="Number of trajectories to include in the visualization bundle.")
-    parser.add_argument("--val-ratio", type=float, default=0.1, help="Fraction of samples reserved for validation.")
-    parser.add_argument("--test-ratio", type=float, default=0.1, help="Fraction of samples reserved for held-out testing.")
-    parser.add_argument("--split-seed", type=int, default=42, help="Random seed for dataset splitting.")
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Optional cap on the number of samples for fast runs.",
+    )
+    parser.add_argument(
+        "--viz-trajectories",
+        type=int,
+        default=32,
+        help="Number of trajectories to include in the visualization bundle.",
+    )
+    parser.add_argument(
+        "--val-ratio",
+        type=float,
+        default=0.1,
+        help="Fraction of samples reserved for validation.",
+    )
+    parser.add_argument(
+        "--test-ratio",
+        type=float,
+        default=0.1,
+        help="Fraction of samples reserved for held-out testing.",
+    )
+    parser.add_argument(
+        "--split-seed", type=int, default=42, help="Random seed for dataset splitting."
+    )
     parser.add_argument(
         "--progress-mode",
         choices=("auto", "bars", "plain"),
@@ -79,7 +140,9 @@ def _select_device(preference: str) -> str:
         return preference
     if torch.cuda.is_available():  # pragma: no cover - hardware specific
         return "cuda"
-    if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():  # pragma: no cover - hardware specific
+    if (
+        getattr(torch.backends, "mps", None) and torch.backends.mps.is_available()
+    ):  # pragma: no cover - hardware specific
         return "mps"
     return "cpu"
 
@@ -93,7 +156,11 @@ def _ensure_ckpt_dir(path_like: str) -> Path:
 
 
 def _artifact_dirs(ckpt_dir: Path, artifact_dir: str | None) -> tuple[Path, Path, Path]:
-    base = Path(artifact_dir).expanduser().resolve() if artifact_dir else (ckpt_dir / "artifacts").resolve()
+    base = (
+        Path(artifact_dir).expanduser().resolve()
+        if artifact_dir
+        else (ckpt_dir / "artifacts").resolve()
+    )
     plots = base / "plots"
     bundles = base / "bundles"
     plots.mkdir(parents=True, exist_ok=True)
@@ -111,7 +178,9 @@ def _find_existing_checkpoint(ckpt_dir: Path, preferred_name: str) -> Path | Non
     return None
 
 
-def _prompt_checkpoint_action(console: Console, ckpt_dir: Path, preferred_name: str, label: str) -> bool:
+def _prompt_checkpoint_action(
+    console: Console, ckpt_dir: Path, preferred_name: str, label: str
+) -> bool:
     checkpoint = _find_existing_checkpoint(ckpt_dir, preferred_name)
     if checkpoint is None:
         return False
@@ -119,20 +188,30 @@ def _prompt_checkpoint_action(console: Console, ckpt_dir: Path, preferred_name: 
         f"[yellow]{label} checkpoint already exists at {checkpoint}. You can reuse it or retrain.[/]"
     )
     if not sys.stdin.isatty():
-        console.print("[yellow]Non-interactive session detected; proceeding with retraining.[/]")
+        console.print(
+            "[yellow]Non-interactive session detected; proceeding with retraining.[/]"
+        )
         return False
     selection = questionary.select(
         f"{label} checkpoint found. What would you like to do?",
         choices=[
-            questionary.Choice(title="Skip step (reuse cached checkpoint)", value="skip"),
-            questionary.Choice(title="Retrain (overwrite checkpoints)", value="retrain"),
+            questionary.Choice(
+                title="Skip step (reuse cached checkpoint)", value="skip"
+            ),
+            questionary.Choice(
+                title="Retrain (overwrite checkpoints)", value="retrain"
+            ),
         ],
         default="skip",
     ).ask()
     if selection == "skip":
-        console.print(f"[green]Skipping {label.lower()} training and reusing {checkpoint.name}.")
+        console.print(
+            f"[green]Skipping {label.lower()} training and reusing {checkpoint.name}."
+        )
         return True
-    console.print(f"[cyan]Continuing {label.lower()} training; existing checkpoints may be overwritten.")
+    console.print(
+        f"[cyan]Continuing {label.lower()} training; existing checkpoints may be overwritten."
+    )
     return False
 
 
@@ -158,14 +237,24 @@ class TrainingProgressDisplay:
 
     def __enter__(self) -> "TrainingProgressDisplay":
         self.progress.__enter__()
-        self.epoch_task = self.progress.add_task("[cyan]overall training", total=self.total_epochs)
+        self.epoch_task = self.progress.add_task(
+            "[cyan]overall training", total=self.total_epochs
+        )
         self.batch_task = self.progress.add_task("[magenta]epoch batches", total=1)
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
         self.progress.__exit__(exc_type, exc, tb)
 
-    def callback(self, phase: str, epoch: int, total_epochs: int, step: int, total_steps: int, loss: float) -> None:
+    def callback(
+        self,
+        phase: str,
+        epoch: int,
+        total_epochs: int,
+        step: int,
+        total_steps: int,
+        loss: float,
+    ) -> None:
         if self.batch_task is None or self.epoch_task is None:
             return
         total_steps = max(1, total_steps)
@@ -180,7 +269,9 @@ class TrainingProgressDisplay:
             description=description,
         )
         if phase == "train" and step >= total_steps:
-            self.progress.update(self.epoch_task, completed=min(epoch, self.total_epochs))
+            self.progress.update(
+                self.epoch_task, completed=min(epoch, self.total_epochs)
+            )
 
 
 class PlainProgressLogger:
@@ -199,14 +290,24 @@ class PlainProgressLogger:
     def __exit__(self, exc_type, exc, tb) -> None:  # noqa: D401 - no cleanup
         return None
 
-    def callback(self, phase: str, epoch: int, total_epochs: int, step: int, total_steps: int, loss: float) -> None:
+    def callback(
+        self,
+        phase: str,
+        epoch: int,
+        total_epochs: int,
+        step: int,
+        total_steps: int,
+        loss: float,
+    ) -> None:
         total_steps = max(1, total_steps)
         eta_text = self._eta_text(phase, epoch, total_epochs, step, total_steps)
         self.console.log(
             f"[{phase}] epoch {epoch}/{total_epochs} | batch {step}/{total_steps} | loss={loss:.4f}{eta_text}"
         )
 
-    def _eta_text(self, phase: str, epoch: int, total_epochs: int, step: int, total_steps: int) -> str:
+    def _eta_text(
+        self, phase: str, epoch: int, total_epochs: int, step: int, total_steps: int
+    ) -> str:
         if phase == "train":
             self._track_train_progress(epoch, total_epochs, step, total_steps)
         remaining = self._estimate_remaining_seconds()
@@ -214,7 +315,9 @@ class PlainProgressLogger:
             return ""
         return f" | ETA {self._format_duration(remaining)}"
 
-    def _track_train_progress(self, epoch: int, total_epochs: int, step: int, total_steps: int) -> None:
+    def _track_train_progress(
+        self, epoch: int, total_epochs: int, step: int, total_steps: int
+    ) -> None:
         epoch = max(epoch, 1)
         total_epochs = max(total_epochs, 1)
         completed_within_epoch = min(step, total_steps)
@@ -258,7 +361,9 @@ def _split_endpoint_dataset(
     if val_ratio < 0 or test_ratio < 0:
         raise ValueError("Validation/test ratios must be non-negative.")
     if val_ratio + test_ratio >= 1.0:
-        raise ValueError("Validation + test ratio must sum to less than 1.0 to retain training data.")
+        raise ValueError(
+            "Validation + test ratio must sum to less than 1.0 to retain training data."
+        )
     total = len(dataset)
     if total < 3:
         raise ValueError("Need at least three samples to create train/val/test splits.")
@@ -270,9 +375,13 @@ def _split_endpoint_dataset(
         test_len = 1
     train_len = total - val_len - test_len
     if train_len <= 0:
-        raise ValueError("Split ratios leave no training samples; decrease validation/test ratios.")
+        raise ValueError(
+            "Split ratios leave no training samples; decrease validation/test ratios."
+        )
     generator = torch.Generator().manual_seed(seed)
-    train_ds, val_ds, test_ds = random_split(dataset, [train_len, val_len, test_len], generator=generator)
+    train_ds, val_ds, test_ds = random_split(
+        dataset, [train_len, val_len, test_len], generator=generator
+    )
     console.print(
         f"Split dataset -> train: {train_len} | val: {val_len} | test: {test_len}"
     )
@@ -286,9 +395,23 @@ def _build_dataloaders(
     batch_size: int,
     workers: int,
 ) -> tuple[DataLoader, DataLoader | None, DataLoader | None]:
-    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=workers)
-    val_loader = None if len(val_ds) == 0 else DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=workers)
-    test_loader = None if len(test_ds) == 0 else DataLoader(test_ds, batch_size=batch_size, shuffle=False, num_workers=workers)
+    train_loader = DataLoader(
+        train_ds, batch_size=batch_size, shuffle=True, num_workers=workers
+    )
+    val_loader = (
+        None
+        if len(val_ds) == 0
+        else DataLoader(
+            val_ds, batch_size=batch_size, shuffle=False, num_workers=workers
+        )
+    )
+    test_loader = (
+        None
+        if len(test_ds) == 0
+        else DataLoader(
+            test_ds, batch_size=batch_size, shuffle=False, num_workers=workers
+        )
+    )
     return train_loader, val_loader, test_loader
 
 
@@ -325,9 +448,15 @@ def _dump_metrics_json(
         "duration_sec": finished_at - started_at,
         "train_loss_history": artifacts.loss_history,
         "val_loss_history": artifacts.val_loss_history,
-        "train_metrics": [{"phase": "train", **entry} for entry in artifacts.metric_history],
-        "val_metrics": [{"phase": "val", **entry} for entry in artifacts.val_metric_history],
-        "test_metrics": [{"phase": "test", **entry} for entry in artifacts.test_metric_history],
+        "train_metrics": [
+            {"phase": "train", **entry} for entry in artifacts.metric_history
+        ],
+        "val_metrics": [
+            {"phase": "val", **entry} for entry in artifacts.val_metric_history
+        ],
+        "test_metrics": [
+            {"phase": "test", **entry} for entry in artifacts.test_metric_history
+        ],
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8") as fp:
@@ -340,7 +469,9 @@ def _sample_training_trajectories(
     count: int,
 ) -> TrajectoryResult:
     if len(dataset) == 0:
-        raise ValueError("Trajectory sequence dataset is empty; cannot create visualization sample.")
+        raise ValueError(
+            "Trajectory sequence dataset is empty; cannot create visualization sample."
+        )
     indices = list(range(min(count, len(dataset))))
     trajectories: list[torch.Tensor] = []
     times_ref: torch.Tensor | None = None
@@ -351,11 +482,21 @@ def _sample_training_trajectories(
         trajectories.append(traj)
     stacked = torch.stack(trajectories, dim=1)  # (T, N, 2)
     history = stacked.cpu().numpy()
-    times_arr = (times_ref if times_ref is not None else torch.linspace(0.0, 1.0, steps=history.shape[0])).cpu().numpy()
+    times_arr = (
+        (
+            times_ref
+            if times_ref is not None
+            else torch.linspace(0.0, 1.0, steps=history.shape[0])
+        )
+        .cpu()
+        .numpy()
+    )
     return TrajectoryResult(history=history, timesteps=times_arr.tolist())
 
 
-def _render_trajectory_sample(result: TrajectoryResult, plots_dir: Path, bundles_dir: Path, console: Console) -> None:
+def _render_trajectory_sample(
+    result: TrajectoryResult, plots_dir: Path, bundles_dir: Path, console: Console
+) -> None:
     bundle_path = bundles_dir / "cnf_training_sample.npz"
     saved_bundle = save_trajectory_bundle(result, bundle_path)
     plotter = TrajectoryPlotter(max_particles=min(result.num_particles, 200))
@@ -364,17 +505,31 @@ def _render_trajectory_sample(result: TrajectoryResult, plots_dir: Path, bundles
     console.print(f"Saved trajectory visualization to {artifact.path}")
 
 
-def _plot_losses(artifacts: TrainingArtifacts, plots_dir: Path, console: Console) -> None:
+def _plot_losses(
+    artifacts: TrainingArtifacts, plots_dir: Path, console: Console
+) -> None:
     if artifacts.loss_history:
-        artifact = plot_loss_curve(artifacts.loss_history, plots_dir / "cnf_train_loss.png", title="CNF training loss")
+        artifact = plot_loss_curve(
+            artifacts.loss_history,
+            plots_dir / "cnf_train_loss.png",
+            title="CNF training loss",
+        )
         console.print(f"Training loss curve written to {artifact.path}")
     else:
-        console.print("[yellow]No training loss history recorded; skipping training loss plot.[/]")
+        console.print(
+            "[yellow]No training loss history recorded; skipping training loss plot.[/]"
+        )
     if artifacts.val_loss_history:
-        val_artifact = plot_loss_curve(artifacts.val_loss_history, plots_dir / "cnf_val_loss.png", title="CNF validation loss")
+        val_artifact = plot_loss_curve(
+            artifacts.val_loss_history,
+            plots_dir / "cnf_val_loss.png",
+            title="CNF validation loss",
+        )
         console.print(f"Validation loss curve written to {val_artifact.path}")
     else:
-        console.print("[yellow]No validation loss history recorded; skipping validation loss plot.[/]")
+        console.print(
+            "[yellow]No validation loss history recorded; skipping validation loss plot.[/]"
+        )
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -392,11 +547,17 @@ def main(argv: Sequence[str] | None = None) -> None:
         capped = min(args.limit, len(dataset_full))
         dataset = Subset(dataset_full, list(range(capped)))
         console.print(f"Capped dataset to {capped} samples for quick experimentation.")
-    train_ds, val_ds, test_ds = _split_endpoint_dataset(dataset, args.val_ratio, args.test_ratio, args.split_seed, console)
-    train_loader, val_loader, test_loader = _build_dataloaders(train_ds, val_ds, test_ds, args.batch_size, args.workers)
+    train_ds, val_ds, test_ds = _split_endpoint_dataset(
+        dataset, args.val_ratio, args.test_ratio, args.split_seed, console
+    )
+    train_loader, val_loader, test_loader = _build_dataloaders(
+        train_ds, val_ds, test_ds, args.batch_size, args.workers
+    )
     dataset_sizes = {"train": len(train_ds), "val": len(val_ds), "test": len(test_ds)}
 
-    model = CNFModel(dim=2, cond_dim=args.context_dim, hidden_dim=args.hidden_dim, depth=args.depth)
+    model = CNFModel(
+        dim=2, cond_dim=args.context_dim, hidden_dim=args.hidden_dim, depth=args.depth
+    )
     artifact_base, plots_dir, bundles_dir = _artifact_dirs(ckpt_dir, args.artifact_dir)
     device = _select_device(args.device)
     console.print(f"Training CNF on device: {device}")
@@ -409,7 +570,11 @@ def main(argv: Sequence[str] | None = None) -> None:
         use_bars = console.is_terminal and sys.stdout.isatty()
     else:
         use_bars = resolved_progress == "bars"
-    progress_context = TrainingProgressDisplay(console, args.epochs) if use_bars else PlainProgressLogger(console)
+    progress_context = (
+        TrainingProgressDisplay(console, args.epochs)
+        if use_bars
+        else PlainProgressLogger(console)
+    )
     with progress_context as progress_display:
         cb = getattr(progress_display, "callback", None)
         training_artifacts = train_cnf_model(
@@ -442,7 +607,9 @@ def main(argv: Sequence[str] | None = None) -> None:
             f"Validation loss -> final {val_summary['final']:.4f} | best {val_summary['min']:.4f} over {int(val_summary['count'])} steps"
         )
     if training_artifacts.test_metric_history:
-        test_losses = [entry["loss"] for entry in training_artifacts.test_metric_history]
+        test_losses = [
+            entry["loss"] for entry in training_artifacts.test_metric_history
+        ]
         test_avg = float(sum(test_losses) / len(test_losses))
         console.print(
             f"Test split average loss: {test_avg:.4f} ({len(test_losses)} batches)"

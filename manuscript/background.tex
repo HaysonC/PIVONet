@@ -1,0 +1,67 @@
+\section{Background}
+\subsection{Governing Advection-Diffusion  Equation}
+We model particle trajectories using the overdamped Langevin equation, which captures advection-diffusion physics while remaining computationally tractable~\cite{Ermak1978}. The position $\mathbf{x}_t = (x_t, y_t) \in \mathbb{R}^2$ evolves according to:
+\begin{equation}
+    d\mathbf{x}_t = \mathbf{u}(\mathbf{x}_t) \, dt + \sqrt{2D} \, d\mathbf{W}_t
+    \label{eq:langevin}
+\end{equation}
+This is a SDE where $\mathbf{u}(\mathbf{x}_t)$\footnote{The simulation to obtain $u$ will be discucsed in Section \ref{sec:xsimulation}} is the local fluid velocity field (Fig.~\ref{fig:cfd_langevin}a), $D$ is the diffusion coefficient, and $\mathbf{W}_t$ is a two-dimensional Brownian motion, neglecting inertial effects. 
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=1\linewidth]{figures/langevin.png}
+    \caption{\textbf{Langevin Dynamics: Particle Motion in Fluid Flow.} The Langevin equation
+    $dx_t = u(x_t)dt + \sqrt{2D}dW_t$ governs particle motion in fluid flows. (a) Poiseuille velocity profile $u(x,y)$ with parabolic shape. (b) Single particle trajectory showing deterministic advection (blue dashed) with superimposed stochastic Brownian fluctuations (red solid). (c) Multiple stochastic realizations from the same initial condition $x_0$, illustrating the spread of particle positions due to randomness.}
+    \label{fig:cfd_langevin}
+\end{figure}
+ 
+ The SDE in Eq.~\eqref{eq:langevin} decomposes particle motion into deterministic advection along streamlines and stochastic diffusion (Fig.~\ref{fig:cfd_langevin}b). The equation is discretized by Euler-Maruyama:
+\begin{equation}
+    \mathbf{x}_{t+\Delta t} = \mathbf{x}_t + \mathbf{u}(\mathbf{x}_t) \, \Delta t + \sqrt{2D \, \Delta t} \, \boldsymbol{\xi}, \quad \boldsymbol{\xi} \sim \mathcal{N}(0, \mathbf{I})
+    \label{eq:euler_maruyama}
+\end{equation}
+with reflecting boundaries at $y = \pm H$. It is mathematically analogous to lattice diffusion systems expressed as linear ODEs of the form 
+\begin{equation}
+    \mathbf{x}'(t) = k A \mathbf{x}(t)
+\end{equation}
+with reflecting endpoints, whose eigenvalue structure governs long-term equilibrium behavior~\cite{ODETextbook}.
+ 
+ 
+The stochastic nature of this process leads to variability in particle trajectories even from identical initial conditions (Fig.~\ref{fig:cfd_langevin}c), consistent with classical dispersion theory~\cite{Taylor1953}. For each trajectory, we record initial conditions $\mathbf{x}_0$, flow parameters $\mathbf{\alpha}$, and the sequence $\{\mathbf{x}_t\}_{t=0}^{T}$.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=1\linewidth]{figures/flow_visualization.png}
+    \caption{\textbf{Flow Profiles for Trajectory Generation.} (a) and (b) are velocity profiles on the top  and bottom right respectively. (c) is located bottom right, a pressure profile visualized via Paraview \cite{paraview}.  (a) \emph{Shock Tube} configuration showing discontinuity complex behavior near the wall. (b) \emph{Cylinder Flow}, where the flow impinges on a cylinder, producing a radial velocity distribution and oscillatory trail downstream. (c) \emph{Euler Vortex}, illustrating rotational shear flow with centerline velocity $U_\text{max}$. }
+    \label{fig:flow_vis}
+\end{figure}
+\subsection{Normalizing Flow}
+For trajectory modeling, continuous normalizing flows (CNFs) treat the transformation as an ODE~\cite{Chen2018,Grathwohl2019}. This builds upon earlier discrete flow-based generative models such as NICE~\cite{Dinh2014}, RealNVP~\cite{Dinh2017}, and Glow~\cite{Kingma2018}, originally introduced for density estimation and variational inference~\cite{Rezende2015}.
+\begin{equation}
+    \frac{d\mathbf{z}(t)}{dt} = g_{\boldsymbol{\theta}}(\mathbf{z}(t), t), \quad \mathbf{z}(0) = \mathbf{z}_0, \quad \mathbf{z}(1) = \mathbf{x}
+    \label{eq:cnf_ode}
+\end{equation}
+The log-density evolves according to the instantaneous change-of-variables formula~\cite{Chen2018}:
+\begin{equation}
+    \frac{d \log p(\mathbf{z}(t))}{dt} = -\text{tr}\left(\frac{\partial g_{\boldsymbol{\theta}}}{\partial \mathbf{z}}\right)
+    \label{eq:cnf_logprob_ode}
+\end{equation}
+This equation tracks how probability mass compresses or expands as particles flow through the learned transformation. The trace of the Jacobian measures the divergence of the velocity field $g_{\boldsymbol{\phi}}$: positive divergence (expansion) decreases density, while negative divergence (compression) increases it. For our particle trajectories, this enables the model to learn where paths concentrate (high-probability regions like flow streamlines) versus where they disperse (low-probability regions affected by strong diffusion)~\cite{Grathwohl2019}.
+\subsection{Bi-directionality and Training}
+We model the mappings between the two distributions as a diffeomorphism. Hence, a key advantage of CNF is bi-directionality: we can integrate the ODE system both forward (from simple $\mathbf{z}_0 \sim \mathcal{N}(0, \mathbf{I})$ to complex trajectory distribution) and backward (from observed trajectory to its latent representation). The forward process generates new trajectories by sampling, while the backward process computes exact likelihoods for training~\cite{Rezende2015}. Figure~\ref{fig:cnf_transformation} illustrates this bidirectional transformation, showing how the initially Gaussian distribution evolves through intermediate time steps into the complex, multimodal distribution of particle trajectories conditioned on flow parameters. The ODE system in Eqs.~\eqref{eq:cnf_ode}--\eqref{eq:cnf_logprob_ode} is solved jointly using adaptive solvers, allowing us to compute exact likelihoods for any trajectory under the learned distribution—essential for training and uncertainty quantification~\cite{Kingma2018}.
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=1\linewidth]{figures/flow_diagram.png}
+    \caption{\textbf{Continuous Normalizing Flow for Particle Trajectory Prediction
+.} The CNF transforms a simple Gaussian base distribution $p$ (a) through intermediate distributions (b) via learned velocity fields $u_t(x)$ (c) to match the complex trajectory distribution $q$. During sampling (d), particles follow stochastic paths from initial position $x_0$ to predicted position $x_1$, capturing both deterministic flow and diffusive behavior.}
+    \label{fig:cnf_transformation}
+\end{figure}
+
+We condition on $\mathbf{x}_0$ and flow parameters $\{U_0, \gamma, U{\text{max}}, H, D, \ldots \} \subset \boldsymbol{\alpha}$ via concatenation or feature-wise transformations. The model is trained by maximizing log-likelihood:
+\begin{equation}
+    \mathcal{L}(\boldsymbol{\theta}) = \mathbb{E}_{\mathbf{x} \sim p_{\text{data}}} \left[ \log p_{\boldsymbol{\theta}}(\mathbf{x} \mid \mathbf{x}_0, \boldsymbol{\alpha}) \right]
+    \label{eq:nf_objective}
+\end{equation}
+
+For inference, we sample $\mathbf{z} \sim \mathcal{N}(0, \mathbf{I})$ and apply $\hat{\mathbf{x}} = f_{\boldsymbol{\theta}}(\mathbf{z}; \mathbf{x}_0, \boldsymbol{\alpha})$ to obtain predicted trajectories without re-running simulations. This framework captures both deterministic flow-driven behavior and stochastic variability, enabling probabilistic trajectory forecasting.
+

@@ -99,7 +99,9 @@ class VelocityFieldPlotter:
     def _subsample(self, array: np.ndarray) -> np.ndarray:
         if array.shape[0] <= self.sample_points:
             return array
-        indices = self.rng.choice(array.shape[0], size=self.sample_points, replace=False)
+        indices = self.rng.choice(
+            array.shape[0], size=self.sample_points, replace=False
+        )
         return array[indices]
 
     def _resolve_output_path(self, output_path: str | Path) -> Path:

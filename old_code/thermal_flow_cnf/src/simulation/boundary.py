@@ -1,4 +1,3 @@
-import numpy as np
 
 
 def reflect_y(y: float, H: float, overshoot_damp: float = 0.0):

@@ -30,13 +30,14 @@ import time
 
 try:
     from matplotlib import cm
+
     _HAS_MPL = True
 except Exception:
     _HAS_MPL = False
 
 
 def find_frame_files(data_dir: Path):
-    files = sorted(data_dir.glob('positions_frame_*.bin'))
+    files = sorted(data_dir.glob("positions_frame_*.bin"))
     return files
 
 
@@ -58,24 +59,32 @@ def viridis_colormap(t):
     for i, tt in enumerate(flat):
         if tt < 0.25:
             a = tt / 0.25
-            c = (0.0 * (1 - a) + 0.1 * a,
-                 0.0 * (1 - a) + 0.3 * a,
-                 0.2 * (1 - a) + 0.9 * a)
+            c = (
+                0.0 * (1 - a) + 0.1 * a,
+                0.0 * (1 - a) + 0.3 * a,
+                0.2 * (1 - a) + 0.9 * a,
+            )
         elif tt < 0.5:
             a = (tt - 0.25) / 0.25
-            c = (0.1 * (1 - a) + 0.0 * a,
-                 0.3 * (1 - a) + 0.6 * a,
-                 0.9 * (1 - a) + 0.3 * a)
+            c = (
+                0.1 * (1 - a) + 0.0 * a,
+                0.3 * (1 - a) + 0.6 * a,
+                0.9 * (1 - a) + 0.3 * a,
+            )
         elif tt < 0.75:
             a = (tt - 0.5) / 0.25
-            c = (0.0 * (1 - a) + 0.7 * a,
-                 0.6 * (1 - a) + 0.8 * a,
-                 0.3 * (1 - a) + 0.1 * a)
+            c = (
+                0.0 * (1 - a) + 0.7 * a,
+                0.6 * (1 - a) + 0.8 * a,
+                0.3 * (1 - a) + 0.1 * a,
+            )
         else:
             a = (tt - 0.75) / 0.25
-            c = (0.7 * (1 - a) + 1.0 * a,
-                 0.8 * (1 - a) + 0.9 * a,
-                 0.1 * (1 - a) + 0.0 * a)
+            c = (
+                0.7 * (1 - a) + 1.0 * a,
+                0.8 * (1 - a) + 0.9 * a,
+                0.1 * (1 - a) + 0.0 * a,
+            )
         out[i] = c
     if t_arr.shape == ():  # scalar input
         return tuple(out[0].tolist())
@@ -92,13 +101,17 @@ def load_frame_numpy(path: Path, scale=1.0):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset', required=True, help='folder under ./data')
-    parser.add_argument('--scale', type=float, default=1.0)
-    parser.add_argument('--stream-threshold-mb', type=float, default=500.0,
-                        help='If dataset total size > threshold, stream frames from disk')
+    parser.add_argument("--dataset", required=True, help="folder under ./data")
+    parser.add_argument("--scale", type=float, default=1.0)
+    parser.add_argument(
+        "--stream-threshold-mb",
+        type=float,
+        default=500.0,
+        help="If dataset total size > threshold, stream frames from disk",
+    )
     args = parser.parse_args()
 
-    data_dir = Path('data') / args.dataset
+    data_dir = Path("data") / args.dataset
     if not data_dir.exists():
         print(f"Data folder {data_dir} not found")
         return
@@ -117,7 +130,9 @@ def main():
     total_bytes = num_frames * N * 3 * 4
     total_mb = total_bytes / (1024.0 * 1024.0)
     stream = total_mb > args.stream_threshold_mb
-    print(f"Found {num_frames} frames, {N} particles per frame, total {total_mb:.1f} MB -> streaming={stream}")
+    print(
+        f"Found {num_frames} frames, {N} particles per frame, total {total_mb:.1f} MB -> streaming={stream}"
+    )
 
     # If not streaming, load all frames into numpy array (num_frames, N, 3)
     frames_np = None
@@ -147,7 +162,7 @@ def main():
     paused = False
     frame_idx = 0
     particle_radius = 0.01
-    color_mode = 'constant'  # or 'speed'
+    color_mode = "constant"  # or 'speed'
     show_grid = True
 
     # Color arrays
@@ -182,21 +197,21 @@ def main():
     while window.running:
         for e in window.get_events():
             # keyboard events
-            if e.key == 'space' and e.type == ti.ui.PRESS:
+            if e.key == "space" and e.type == ti.ui.PRESS:
                 paused = not paused
-            if e.key == 'right' and e.type == ti.ui.PRESS:
+            if e.key == "right" and e.type == ti.ui.PRESS:
                 frame_idx = min(frame_idx + 1, num_frames - 1)
                 paused = True
-            if e.key == 'left' and e.type == ti.ui.PRESS:
+            if e.key == "left" and e.type == ti.ui.PRESS:
                 frame_idx = max(frame_idx - 1, 0)
                 paused = True
-            if e.key == ']' and e.type == ti.ui.PRESS:
+            if e.key == "]" and e.type == ti.ui.PRESS:
                 particle_radius *= 1.1
-            if e.key == '[' and e.type == ti.ui.PRESS:
+            if e.key == "[" and e.type == ti.ui.PRESS:
                 particle_radius = max(1e-5, particle_radius / 1.1)
-            if e.key in ('c', 'C') and e.type == ti.ui.PRESS:
-                color_mode = 'speed' if color_mode == 'constant' else 'constant'
-            if e.key in ('g', 'G') and e.type == ti.ui.PRESS:
+            if e.key in ("c", "C") and e.type == ti.ui.PRESS:
+                color_mode = "speed" if color_mode == "constant" else "constant"
+            if e.key in ("g", "G") and e.type == ti.ui.PRESS:
                 show_grid = not show_grid
 
             # Mouse interaction: right-button drag for orbit
@@ -216,8 +231,8 @@ def main():
             # Scroll to zoom
             if e.type == ti.ui.SCROLL:
                 # e.delta is (dx, dy)
-                ddy = e.delta[1] if hasattr(e, 'delta') else 0.0
-                distance *= (1.0 - ddy * 0.1)
+                ddy = e.delta[1] if hasattr(e, "delta") else 0.0
+                distance *= 1.0 - ddy * 0.1
                 distance = max(0.1, distance)
                 update_camera()
 
@@ -239,7 +254,7 @@ def main():
 
         # Compute speeds if needed
         speeds = None
-        if color_mode == 'speed':
+        if color_mode == "speed":
             # get prev positions
             prev_np = prev_pos_field.to_numpy()
             if prev_np.shape[0] != N:
@@ -247,11 +262,15 @@ def main():
             disp = cur_np - prev_np
             speed = np.linalg.norm(disp, axis=1)  # per-frame displacement
             # update running max for normalization
-            running_max_speed = max(running_max_speed, speed.max() if speed.size>0 else 0.0)
+            running_max_speed = max(
+                running_max_speed, speed.max() if speed.size > 0 else 0.0
+            )
             vmax = running_max_speed if running_max_speed > 1e-8 else 1e-8
             speed_norm = speed / vmax
             # build color array
-            colors = np.array([viridis_colormap(t) for t in speed_norm], dtype=np.float32)
+            colors = np.array(
+                [viridis_colormap(t) for t in speed_norm], dtype=np.float32
+            )
             speeds = colors
 
         # copy current to prev
@@ -266,7 +285,7 @@ def main():
         # background: white
         canvas.set_background_color((1.0, 1.0, 1.0))
 
-    # optional grid helper (simple XY grid at z=0)
+        # optional grid helper (simple XY grid at z=0)
         if show_grid:
             # draw faint grid lines using scene.lines if available
             try:
@@ -301,7 +320,10 @@ def main():
         # compute yaw to rotate mean_disp to +x axis
         if mean_norm > 1e-8:
             ang = np.arctan2(mean_disp[1], mean_disp[0])
-            rot = np.array([[np.cos(-ang), -np.sin(-ang)], [np.sin(-ang), np.cos(-ang)]], dtype=np.float32)
+            rot = np.array(
+                [[np.cos(-ang), -np.sin(-ang)], [np.sin(-ang), np.cos(-ang)]],
+                dtype=np.float32,
+            )
         else:
             rot = np.eye(2, dtype=np.float32)
 
@@ -336,12 +358,19 @@ def main():
         try:
             bx0, by0 = min_xy[0], min_xy[1]
             bx1, by1 = max_xy[0], max_xy[1]
-            rect_lines = np.array([
-                [bx0, by0, 0.0], [bx1, by0, 0.0],
-                [bx1, by0, 0.0], [bx1, by1, 0.0],
-                [bx1, by1, 0.0], [bx0, by1, 0.0],
-                [bx0, by1, 0.0], [bx0, by0, 0.0],
-            ], dtype=np.float32)
+            rect_lines = np.array(
+                [
+                    [bx0, by0, 0.0],
+                    [bx1, by0, 0.0],
+                    [bx1, by0, 0.0],
+                    [bx1, by1, 0.0],
+                    [bx1, by1, 0.0],
+                    [bx0, by1, 0.0],
+                    [bx0, by1, 0.0],
+                    [bx0, by0, 0.0],
+                ],
+                dtype=np.float32,
+            )
             canvas.lines(rect_lines, width=2.0, color=(0.0, 0.0, 0.0))
         except Exception:
             pass
@@ -381,5 +410,5 @@ def main():
         window.show()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

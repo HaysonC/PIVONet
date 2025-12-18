@@ -55,7 +55,9 @@ def _load_metrics(artifact_root: Path, method: str) -> ComparisonRecord | None:
     summary = json.loads(candidate.read_text(encoding="utf-8"))
     vsde_info = summary.get("vsde")
     cnf_info = summary.get("cnf")
-    vsde_mae = _safe_float(vsde_info.get("mae")) if isinstance(vsde_info, dict) else None
+    vsde_mae = (
+        _safe_float(vsde_info.get("mae")) if isinstance(vsde_info, dict) else None
+    )
     cnf_mae = _safe_float(cnf_info.get("mae")) if isinstance(cnf_info, dict) else None
     return ComparisonRecord(method=method, vsde_mae=vsde_mae, cnf_mae=cnf_mae)
 
@@ -98,7 +100,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     args = _parse_args(argv)
     artifact_root = Path(args.artifact_root)
     methods = args.methods or DEFAULT_METHODS
-    output_base = Path(args.output_dir) if args.output_dir else (artifact_root / "charts")
+    output_base = (
+        Path(args.output_dir) if args.output_dir else (artifact_root / "charts")
+    )
     output_base.mkdir(parents=True, exist_ok=True)
     records: list[ComparisonRecord] = []
     for method in methods:

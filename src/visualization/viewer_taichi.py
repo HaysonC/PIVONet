@@ -34,14 +34,13 @@ from src.utils.paths import project_root
 from matplotlib import cm
 
 
-
 def find_frame_files(data_dir: Path):
     # Look for .npz trajectory bundles in trajectories subdir
-    bundles = sorted((data_dir / 'trajectories').glob('*.npz'))
+    bundles = sorted((data_dir / "trajectories").glob("*.npz"))
     if bundles:
         return bundles[:1]  # Use first bundle for now
     # Fallback to old format
-    files = sorted(data_dir.glob('positions_frame_*.bin'))
+    files = sorted(data_dir.glob("positions_frame_*.bin"))
     return files
 
 
@@ -56,10 +55,11 @@ def viridis_colormap(t):
     rgb = rgba[..., :3]
     return rgb
 
+
 def load_frame_numpy(path: Path, scale=1.0):
-    if path.suffix == '.npz':
+    if path.suffix == ".npz":
         data = np.load(path)
-        history = data['history']  # (timesteps, particles, 2)
+        history = data["history"]  # (timesteps, particles, 2)
         pos = np.zeros((history.shape[0], history.shape[1], 3), dtype=np.float32)
         pos[:, :, :2] = history * scale
         return pos
@@ -74,32 +74,53 @@ def load_frame_numpy(path: Path, scale=1.0):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset', help='folder under ./data')
-    parser.add_argument('--scale', type=float, default=1.0)
-    parser.add_argument('--stream-threshold-mb', type=float, default=500.0,
-                        help='If dataset total size > threshold, stream frames from disk')
-    parser.add_argument('--cnf-checkpoint', help='Path to CNF checkpoint for interactive generation')
-    parser.add_argument('--context-dim', type=int, default=3, help='Context dimension for CNF')
-    parser.add_argument('--cnf-hidden-dim', type=int, default=64, help='Hidden dim for CNF')
-    parser.add_argument('--cnf-depth', type=int, default=3, help='Depth for CNF')
+    parser.add_argument("--dataset", help="folder under ./data")
+    parser.add_argument("--scale", type=float, default=1.0)
+    parser.add_argument(
+        "--stream-threshold-mb",
+        type=float,
+        default=500.0,
+        help="If dataset total size > threshold, stream frames from disk",
+    )
+    parser.add_argument(
+        "--cnf-checkpoint", help="Path to CNF checkpoint for interactive generation"
+    )
+    parser.add_argument(
+        "--context-dim", type=int, default=3, help="Context dimension for CNF"
+    )
+    parser.add_argument(
+        "--cnf-hidden-dim", type=int, default=64, help="Hidden dim for CNF"
+    )
+    parser.add_argument("--cnf-depth", type=int, default=3, help="Depth for CNF")
     args = parser.parse_args()
 
     # Set default checkpoint if not provided
     if not args.cnf_checkpoint and args.dataset:
-        default_ckpt = project_root() / 'cache' / 'checkpoints' / f'{args.dataset}_cnf' / 'cnf_latest.pt'
+        default_ckpt = (
+            project_root()
+            / "cache"
+            / "checkpoints"
+            / f"{args.dataset}_cnf"
+            / "cnf_latest.pt"
+        )
         if default_ckpt.exists():
             args.cnf_checkpoint = str(default_ckpt)
             print(f"Using default CNF checkpoint: {args.cnf_checkpoint}")
 
     cnf_model = None
     if args.cnf_checkpoint:
-        cnf_model = CNFModel(dim=2, cond_dim=args.context_dim, hidden_dim=args.cnf_hidden_dim, depth=args.cnf_depth)
-        state = torch.load(args.cnf_checkpoint, map_location='cpu')
+        cnf_model = CNFModel(
+            dim=2,
+            cond_dim=args.context_dim,
+            hidden_dim=args.cnf_hidden_dim,
+            depth=args.cnf_depth,
+        )
+        state = torch.load(args.cnf_checkpoint, map_location="cpu")
         cnf_model.load_state_dict(state)
         cnf_model.eval()
         print(f"Loaded CNF model from {args.cnf_checkpoint}")
 
-    data_dir = project_root() / 'data' / args.dataset
+    data_dir = project_root() / "data" / args.dataset
     if not data_dir.exists():
         print(f"Data folder {data_dir} not found")
         return
@@ -112,7 +133,7 @@ def main():
     # Determine particle count from first frame
     first = frame_files[0]
     first_arr = load_frame_numpy(first, scale=args.scale)
-    if first.suffix == '.npz':
+    if first.suffix == ".npz":
         # first_arr is (timesteps, particles, 3)
         frames_np = first_arr
         num_frames = frames_np.shape[0]
@@ -126,7 +147,9 @@ def main():
         total_bytes = num_frames * N * 3 * 4
         total_mb = total_bytes / (1024.0 * 1024.0)
         stream = total_mb > args.stream_threshold_mb
-        print(f"Found {num_frames} frames, {N} particles per frame, total {total_mb:.1f} MB -> streaming={stream}")
+        print(
+            f"Found {num_frames} frames, {N} particles per frame, total {total_mb:.1f} MB -> streaming={stream}"
+        )
 
         # If not streaming, load all frames into numpy array (num_frames, N, 3)
         frames_np = None
@@ -160,12 +183,9 @@ def main():
     paused = False
     frame_idx = 0
     particle_radius = 0.05
-    color_mode = 'constant'  # or 'speed'
+    color_mode = "constant"  # or 'speed'
     show_grid = True
     last_lmb_pressed = False
-
-    # Color arrays
-    const_color = (0.4, 0.7, 1.0)
 
     # Keep running max speed for normalization
     running_max_speed = 1e-6
@@ -174,7 +194,6 @@ def main():
     azimuth = -45.0  # degrees
     elevation = -30.0
     distance = 4.0
-    prev_mouse = None
 
     last_time = time.time()
     target_fps = 60.0
@@ -196,41 +215,88 @@ def main():
     while window.running:
         for e in window.get_events():
             # keyboard events
-            if hasattr(e, 'key') and e.key == 'space' and hasattr(e, 'action') and e.action == ti.ui.PRESS:
+            if (
+                hasattr(e, "key")
+                and e.key == "space"
+                and hasattr(e, "action")
+                and e.action == ti.ui.PRESS
+            ):
                 paused = not paused
-            if hasattr(e, 'key') and e.key == 'right' and hasattr(e, 'action') and e.action == ti.ui.PRESS:
+            if (
+                hasattr(e, "key")
+                and e.key == "right"
+                and hasattr(e, "action")
+                and e.action == ti.ui.PRESS
+            ):
                 frame_idx = min(frame_idx + 1, num_frames - 1)
                 paused = True
-            if hasattr(e, 'key') and e.key == 'left' and hasattr(e, 'action') and e.action == ti.ui.PRESS:
+            if (
+                hasattr(e, "key")
+                and e.key == "left"
+                and hasattr(e, "action")
+                and e.action == ti.ui.PRESS
+            ):
                 frame_idx = max(frame_idx - 1, 0)
                 paused = True
-            if hasattr(e, 'key') and e.key == ']' and hasattr(e, 'action') and e.action == ti.ui.PRESS:
+            if (
+                hasattr(e, "key")
+                and e.key == "]"
+                and hasattr(e, "action")
+                and e.action == ti.ui.PRESS
+            ):
                 particle_radius *= 1.1
-            if hasattr(e, 'key') and e.key == '[' and hasattr(e, 'action') and e.action == ti.ui.PRESS:
+            if (
+                hasattr(e, "key")
+                and e.key == "["
+                and hasattr(e, "action")
+                and e.action == ti.ui.PRESS
+            ):
                 particle_radius = max(1e-5, particle_radius / 1.1)
-            if hasattr(e, 'key') and e.key in ('c', 'C') and hasattr(e, 'action') and e.action == ti.ui.PRESS:
-                color_mode = 'speed' if color_mode == 'constant' else 'constant'
-            if hasattr(e, 'key') and e.key in ('g', 'G') and hasattr(e, 'action') and e.action == ti.ui.PRESS:
+            if (
+                hasattr(e, "key")
+                and e.key in ("c", "C")
+                and hasattr(e, "action")
+                and e.action == ti.ui.PRESS
+            ):
+                color_mode = "speed" if color_mode == "constant" else "constant"
+            if (
+                hasattr(e, "key")
+                and e.key in ("g", "G")
+                and hasattr(e, "action")
+                and e.action == ti.ui.PRESS
+            ):
                 show_grid = not show_grid
 
             # Left mouse click for generating trajectory
-            if cnf_model is not None and hasattr(e, 'action') and e.action == ti.ui.PRESS and hasattr(e, 'key') and e.key == ti.ui.LMB:
+            if (
+                cnf_model is not None
+                and hasattr(e, "action")
+                and e.action == ti.ui.PRESS
+                and hasattr(e, "key")
+                and e.key == ti.ui.LMB
+            ):
                 mx, my = window.get_cursor_pos()
                 # Simple mapping: assume screen 0-1 maps to world -5 to 5
                 world_x = (mx - 0.5) * 10.0
                 world_y = (my - 0.5) * 10.0
-                print(f"Clicked at screen ({mx:.2f}, {my:.2f}) -> world ({world_x:.2f}, {world_y:.2f})")
+                print(
+                    f"Clicked at screen ({mx:.2f}, {my:.2f}) -> world ({world_x:.2f}, {world_y:.2f})"
+                )
                 context = torch.tensor([[world_x, world_y, 0.0]], dtype=torch.float32)
                 with torch.no_grad():
                     traj = cnf_model.sample_trajectory(1, context, steps=60)
                 traj_np = traj.cpu().numpy().astype(np.float32)  # (60, 1, 2)
                 # Add z=0
-                traj_3d = np.concatenate([traj_np, np.zeros((60, 1, 1), dtype=np.float32)], axis=2)  # (60, 1, 3)
+                traj_3d = np.concatenate(
+                    [traj_np, np.zeros((60, 1, 1), dtype=np.float32)], axis=2
+                )  # (60, 1, 3)
                 if generated_frames is None:
                     generated_frames = traj_3d
                     N_gen = 1
                 else:
-                    generated_frames = np.concatenate([generated_frames, traj_3d], axis=1)
+                    generated_frames = np.concatenate(
+                        [generated_frames, traj_3d], axis=1
+                    )
                     N_gen += 1
                 print(f"Added orange particle trajectory. Total generated: {N_gen}")
 
@@ -241,13 +307,17 @@ def main():
             # Simple mapping: assume screen 0-1 maps to world -5 to 5
             world_x = (mx - 0.5) * 10.0
             world_y = (my - 0.5) * 10.0
-            print(f"Clicked at screen ({mx:.2f}, {my:.2f}) -> world ({world_x:.2f}, {world_y:.2f})")
+            print(
+                f"Clicked at screen ({mx:.2f}, {my:.2f}) -> world ({world_x:.2f}, {world_y:.2f})"
+            )
             context = torch.tensor([[world_x, world_y, 0.0]], dtype=torch.float32)
             with torch.no_grad():
                 traj = cnf_model.sample_trajectory(1, context, steps=60)
             traj_np = traj.cpu().numpy().astype(np.float32)  # (60, 1, 2)
             # Add z=0
-            traj_3d = np.concatenate([traj_np, np.zeros((60, 1, 1), dtype=np.float32)], axis=2)  # (60, 1, 3)
+            traj_3d = np.concatenate(
+                [traj_np, np.zeros((60, 1, 1), dtype=np.float32)], axis=2
+            )  # (60, 1, 3)
             if generated_frames is None:
                 generated_frames = traj_3d
                 N_gen = 1
@@ -275,7 +345,7 @@ def main():
 
         # Compute speeds if needed
         speeds = None
-        if color_mode == 'speed':
+        if color_mode == "speed":
             # get prev positions
             prev_np = prev_pos_field.to_numpy()
             if prev_np.shape[0] != N:
@@ -283,11 +353,15 @@ def main():
             disp = cur_np - prev_np
             speed = np.linalg.norm(disp, axis=1)  # per-frame displacement
             # update running max for normalization
-            running_max_speed = max(running_max_speed, speed.max() if speed.size>0 else 0.0)
+            running_max_speed = max(
+                running_max_speed, speed.max() if speed.size > 0 else 0.0
+            )
             vmax = running_max_speed if running_max_speed > 1e-8 else 1e-8
             speed_norm = speed / vmax
             # build color array
-            colors = np.array([viridis_colormap(t) for t in speed_norm], dtype=np.float32)
+            colors = np.array(
+                [viridis_colormap(t) for t in speed_norm], dtype=np.float32
+            )
             speeds = colors
 
         # copy current to prev
@@ -302,7 +376,7 @@ def main():
         # background: white
         canvas.set_background_color((1.0, 1.0, 1.0))
 
-    # optional grid helper (simple XY grid at z=0)
+        # optional grid helper (simple XY grid at z=0)
         if show_grid:
             # draw faint grid lines using scene.lines if available
             try:
@@ -337,7 +411,10 @@ def main():
         # compute yaw to rotate mean_disp to +x axis
         if mean_norm > 1e-8:
             ang = np.arctan2(mean_disp[1], mean_disp[0])
-            rot = np.array([[np.cos(-ang), -np.sin(-ang)], [np.sin(-ang), np.cos(-ang)]], dtype=np.float32)
+            rot = np.array(
+                [[np.cos(-ang), -np.sin(-ang)], [np.sin(-ang), np.cos(-ang)]],
+                dtype=np.float32,
+            )
         else:
             rot = np.eye(2, dtype=np.float32)
 
@@ -372,12 +449,19 @@ def main():
         try:
             bx0, by0 = min_xy[0], min_xy[1]
             bx1, by1 = max_xy[0], max_xy[1]
-            rect_lines = np.array([
-                [bx0, by0, 0.0], [bx1, by0, 0.0],
-                [bx1, by0, 0.0], [bx1, by1, 0.0],
-                [bx1, by1, 0.0], [bx0, by1, 0.0],
-                [bx0, by1, 0.0], [bx0, by0, 0.0],
-            ], dtype=np.float32)
+            rect_lines = np.array(
+                [
+                    [bx0, by0, 0.0],
+                    [bx1, by0, 0.0],
+                    [bx1, by0, 0.0],
+                    [bx1, by1, 0.0],
+                    [bx1, by1, 0.0],
+                    [bx0, by1, 0.0],
+                    [bx0, by1, 0.0],
+                    [bx0, by0, 0.0],
+                ],
+                dtype=np.float32,
+            )
             canvas.lines(rect_lines, width=2.0, color=(0.0, 0.0, 0.0))
         except Exception:
             pass
@@ -418,11 +502,13 @@ def main():
             pos_gen_np = generated_frames[frame_idx % 60]  # (N_gen, 3)
             pos_gen_field = ti.Vector.field(3, dtype=ti.f32, shape=N_gen)
             pos_gen_field.from_numpy(pos_gen_np.astype(np.float32))
-            scene.particles(pos_gen_field, radius=particle_radius * 2, color=(1.0, 0.5, 0.0))  # orange, larger
+            scene.particles(
+                pos_gen_field, radius=particle_radius * 2, color=(1.0, 0.5, 0.0)
+            )  # orange, larger
 
         canvas.scene(scene)
         window.show()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

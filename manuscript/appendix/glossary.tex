@@ -1,0 +1,105 @@
+\section{Glossary of Technical Terms}
+See Table~\ref{tb:glossary} next page for selected terms and phrases that appear in the main paper and are commonplace in machine learning and physics-informed neural networks (PINNs) literature. This glossary is intended to help readers unfamiliar with these concepts better understand the terminology used throughout this work.
+
+\begin{table*}[]
+    \centering
+    \caption{Glossary of key VSDE, PINN, and ML concepts referenced in this work.}
+    \begin{tabularx}{\textwidth}{lX}
+        \hline
+        \multicolumn{2}{l}{\textbf{Latent Representations}} \\
+        \hline
+        Variational parameters & The encoder output pair \(\mu,\sigma\) that parametrize the surrogate posterior \(q(z_0\mid x)\); sampled via reparameterization trick to allow gradient flow. \\
+        Posterior & Distribution over latent initial states conditioned on observations; VSDE trains \(q(z_0\mid x)\) to maintain data consistency. \\
+        Latent space & Lower-dimensional space where the CNF and VSDE operate; latent coordinates \(z\) are decoded back to observed data \(x\). \\
+        Latent vector & Hidden representation \(z\) in latent space; VSDE integrates \(z\) to produce trajectories decoded into observations. \\
+        Manifold & Lower-dimensional surface in latent space where training samples lie; CNF and VSDE enforce drift along it. \\
+        Reparameterization trick & Method to sample from distributions in a differentiable way by expressing samples as deterministic functions of parameters and noise. \\
+        \hline
+        \multicolumn{2}{l}{\textbf{Dynamics and Control}} \\
+        \hline
+        Control signal & Learned drift term \(u(z,t)\) steering latent trajectories toward observations. \\
+        Diffusion coefficient & Scalar or vector \(g\) scaling Brownian increments \(\mathrm{d}W_t\), injecting uncertainty into latent paths. \\
+        Continuous Normalizing Flow (CNF) & Neural ODE providing backbone drift \(f_\theta(z, context, t)\); warps latent coordinates while enabling adjoint gradients. \\
+        Clamping & Logic that limits control magnitudes and absorbs out-of-manifold trajectories. \\
+        Stability & Ensuring numerical and statistical properties remain bounded during integration. \\
+        Adjoint method & Technique for computing gradients through ODE integrators by solving backward-in-time adjoint ODEs. \\
+        Jacobian & Matrix of partial derivatives; important for drift sensitivity and CNF stability. \\
+        \hline
+        \multicolumn{2}{l}{\textbf{Training and Optimization}} \\
+        \hline
+        Learning rate (LR) & Step size for optimizer updates; affects convergence speed and stability. \\
+        Optimizer & Algorithm (e.g., Adam, SGD) updating model parameters using computed gradients. \\
+        Training & Phase where model parameters are updated to minimize loss functions like ELBO. \\
+        Online/offline & Online processes data in real-time; offline processes pre-collected datasets in batches. \\
+        Batching & Dividing data into smaller subsets to improve memory usage and optimization. \\
+        Epoch & One complete pass over the training dataset. \\
+        Regularization & Loss penalties (e.g., KL, control cost) to prevent overfitting. \\
+        Gradient clipping & Limiting gradient magnitude to prevent exploding gradients. \\
+        Early stopping & Halting training when validation loss stops improving to avoid overfitting. \\
+        \hline
+        \multicolumn{2}{l}{\textbf{Losses and Metrics}} \\
+        \hline
+        KL divergence & Measures non-symmetric distance between two distributions. \\
+        Evidence Lower Bound (ELBO) & Variational objective combining reconstruction, KL, and physics/control penalties. \\
+        $L_2$, $L_1$ norms & Vector magnitude measures; used in loss functions. \\
+        MAE and MSE & Mean Absolute Error (MAE) and Mean Squared Error (MSE); common regression losses. \\
+        Overfitting & Model memorizes training noise, failing to generalize. \\
+        Physics loss & Loss enforcing consistency with physical laws (e.g., PDE residuals in PINNs). \\
+        Residual error & Difference between predicted and true values; often minimized in regression or PINN training. \\
+        \hline
+        \multicolumn{2}{l}{\textbf{Neural Network Concepts}} \\
+        \hline
+        Neural network & Parameterized map of layers and nonlinearities trained via gradient descent. \\
+        Activation function & Nonlinear function applied to layer outputs (e.g., ReLU, tanh, GELU). \\
+        Time embeddings & Encodes continuous time values into higher-dimensional vectors (Fourier features). \\
+        Attention & Mechanism to weigh inputs dynamically based on relevance; used in Transformers. \\
+        Transformer & Architecture using self-attention for sequence modeling. \\
+        RNN / GRU / LSTM & Recurrent neural networks for temporal data; GRU and LSTM include gates to manage memory. \\
+        Inference & Generating predictions or latent trajectories from a trained model. \\
+        Batch normalization & Technique normalizing layer inputs to stabilize training. \\
+        Dropout & Regularization technique randomly dropping units during training to prevent overfitting. \\
+        \hline
+        \multicolumn{2}{l}{\textbf{Physics-Informed Machine Learning}} \\
+        \hline
+        PINN & Neural network trained to satisfy physical laws described by PDEs/ODEs using physics-based loss. \\
+        PDE residual & Difference between predicted solution and PDE evaluated at sample points. \\
+        Boundary/Initial conditions & Known values at domain boundaries or initial time guiding PINN training. \\
+        Constraint enforcement & Ensuring model predictions respect physical or geometric constraints. \\
+        Surrogate modeling & Neural networks approximating expensive simulations while enforcing physics. \\
+        \hline
+        \multicolumn{2}{l}{\textbf{Generative Models}} \\
+        \hline
+        VAE & Variational Autoencoder, probabilistic encoder-decoder learning latent representations. \\
+        Diffusion model & Generative model transforming noise into samples via stochastic diffusion. \\
+        GAN & Generative Adversarial Network with generator and discriminator trained adversarially. \\
+        Flow-based model & Generative model using invertible transformations to map between latent and observed data. \\
+        \hline
+        \multicolumn{2}{l}{\textbf{Probabilistic Concepts}} \\
+        \hline
+        Bayesian inference & Updating beliefs (probability distributions) based on observed data. \\
+        Prior & Distribution encoding assumptions before seeing data. \\
+        Posterior & Updated distribution after observing data. \\
+        Likelihood & Probability of observed data under a given model. \\
+        Uncertainty quantification & Estimating confidence or variance in model predictions. \\
+        \hline
+        \multicolumn{2}{l}{\textbf{Numerical Methods}} \\
+        \hline
+        ODE solver & Algorithm for numerically integrating ordinary differential equations (e.g., Runge-Kutta). \\
+        Stochastic integration & Integration including random terms (e.g., Brownian motion). \\
+        Time discretization & Approximating continuous dynamics with discrete time steps. \\
+        Stability analysis & Ensuring numerical methods produce bounded and accurate solutions. \\
+        Convergence & Property that solution approaches the true value as step size decreases. \\
+        \hline
+        \multicolumn{2}{l}{\textbf{Miscellaneous Concepts}} \\
+        \hline
+        Numerical stability & Ensuring computations do not diverge or oscillate unphysically. \\
+        Surrogate posterior & Learned approximation of the true latent posterior. \\
+        Feature embedding & Mapping raw input into higher-dimensional representation for modeling. \\
+        Residual connection & Adding input of a layer to its output to improve gradient flow. \\
+        Hyperparameter & Configuration parameter (not learned) affecting training and performance. \\
+        \hline
+    \end{tabularx}
+    \label{tb:glossary}
+\end{table*}
+
+\newpage

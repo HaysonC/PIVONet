@@ -55,7 +55,9 @@ class TrajectoryPlotter(TrajectoryVisualizer):
 
         ax.set_xlabel("x")
         ax.set_ylabel("y")
-        ax.set_title(title or f"Trajectories ({len(indices)} of {num_particles} particles)")
+        ax.set_title(
+            title or f"Trajectories ({len(indices)} of {num_particles} particles)"
+        )
         ax.set_aspect("equal")
         ax.grid(True, linestyle="--", linewidth=0.4, alpha=0.4)
 

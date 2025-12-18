@@ -1,18 +1,19 @@
 from __future__ import annotations
 
-from typing import Iterable
 
 import torch
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
-from tqdm import tqdm
 
 from .base_cnf import CNF
 from .variational_sde import VariationalSDEModel
 from ..utils.io import save_checkpoint
 
+
 # --- Physics losses (microfluidics) ---
-def no_slip_loss(model: CNF, context: torch.Tensor, H: float, n_samples: int = 128) -> torch.Tensor:
+def no_slip_loss(
+    model: CNF, context: torch.Tensor, H: float, n_samples: int = 128
+) -> torch.Tensor:
     """Penalize non-zero tangential velocity at channel walls y=±H.
 
     Approximates by sampling random x, setting y at ±H and evaluating field.
@@ -24,7 +25,11 @@ def no_slip_loss(model: CNF, context: torch.Tensor, H: float, n_samples: int = 1
         idx = torch.randint(0, B, (min(n_samples, B),), device=context.device)
     ctx = context[idx]
     x_rand = torch.rand(ctx.size(0), 1, device=ctx.device, dtype=ctx.dtype)
-    ys = torch.tensor([[-H], [H]], device=ctx.device, dtype=ctx.dtype).repeat(1, x_rand.size(0)).T  # (K,1)
+    ys = (
+        torch.tensor([[-H], [H]], device=ctx.device, dtype=ctx.dtype)
+        .repeat(1, x_rand.size(0))
+        .T
+    )  # (K,1)
     # Build two wall batches and concatenate
     z_bottom = torch.cat([x_rand, -torch.ones_like(x_rand) * H], dim=1)
     z_top = torch.cat([x_rand, torch.ones_like(x_rand) * H], dim=1)
@@ -34,7 +39,10 @@ def no_slip_loss(model: CNF, context: torch.Tensor, H: float, n_samples: int = 1
     # Expect near-zero both components at wall; emphasize normal component (here y) & tangential (x) equally
     return (f.abs()).mean()
 
-def bernoulli_like_loss(model: CNF, context: torch.Tensor, rho: float = 1.0, sample_pairs: int = 64) -> torch.Tensor:
+
+def bernoulli_like_loss(
+    model: CNF, context: torch.Tensor, rho: float = 1.0, sample_pairs: int = 64
+) -> torch.Tensor:
     """Encourage approximate Bernoulli invariance: P + 0.5*rho*|u|^2 ~ const across sampled pairs.
 
     We don't model pressure P explicitly; approximate by minimizing variance of |u|^2 across batch.
@@ -46,15 +54,17 @@ def bernoulli_like_loss(model: CNF, context: torch.Tensor, rho: float = 1.0, sam
         ctx = context[idx]
         # Sample interior points y ~ Uniform(-0.9H,0.9H) if H present in context (assume second feature maybe y0). Fallback to N(0,1).
     # Heuristic: context may contain (x0, y0, theta). We'll sample around provided y0.
-    y0 = ctx[:,1:2]
-    x0 = ctx[:,0:1]
+    y0 = ctx[:, 1:2]
+    x0 = ctx[:, 0:1]
     z = torch.cat([x0, y0], dim=1)
     f = model.eval_field(z, ctx, t=1.0)
     speed2 = (f**2).sum(dim=1)
     return speed2.var(unbiased=False)
 
 
-def compute_log_likelihood(model: CNF, x: torch.Tensor, context: torch.Tensor, steps_jitter: int = 0) -> torch.Tensor:
+def compute_log_likelihood(
+    model: CNF, x: torch.Tensor, context: torch.Tensor, steps_jitter: int = 0
+) -> torch.Tensor:
     # model.log_prob returns (B,1)
     return model.log_prob(x, context, steps=16, stochastic_steps_jitter=steps_jitter)
 
@@ -93,16 +103,25 @@ def train_cnf(
                 x_final = x_final + torch.randn_like(x_final) * float(data_noise_std)
 
             optim.zero_grad(set_to_none=True)
-            log_likelihood = compute_log_likelihood(model, x_final, context, steps_jitter)
+            log_likelihood = compute_log_likelihood(
+                model, x_final, context, steps_jitter
+            )
             base_loss = -log_likelihood.mean()
             # Physics coefficients optionally passed via context attributes (monkey patch) for now
             phys_loss = torch.tensor(0.0, device=device)
             if hasattr(model, "phys_cfg"):
                 cfg = getattr(model, "phys_cfg")
-                if cfg.get("no_slip_coef", 0.0) > 0.0 and cfg.get("H", None) is not None:
-                    phys_loss = phys_loss + cfg["no_slip_coef"] * no_slip_loss(model, context, H=float(cfg["H"]))
+                if (
+                    cfg.get("no_slip_coef", 0.0) > 0.0
+                    and cfg.get("H", None) is not None
+                ):
+                    phys_loss = phys_loss + cfg["no_slip_coef"] * no_slip_loss(
+                        model, context, H=float(cfg["H"])
+                    )
                 if cfg.get("bernoulli_coef", 0.0) > 0.0:
-                    phys_loss = phys_loss + cfg["bernoulli_coef"] * bernoulli_like_loss(model, context)
+                    phys_loss = phys_loss + cfg["bernoulli_coef"] * bernoulli_like_loss(
+                        model, context
+                    )
             loss = base_loss + phys_loss
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
@@ -115,7 +134,9 @@ def train_cnf(
         scheduler.step()
         avg = running / max(1, len(dataloader))
         if ckpt_dir is not None:
-            save_checkpoint(model, optim, f"{ckpt_dir}/cnf_epoch{epoch}.pt", epoch=epoch, loss=avg)
+            save_checkpoint(
+                model, optim, f"{ckpt_dir}/cnf_epoch{epoch}.pt", epoch=epoch, loss=avg
+            )
 
     return model
 
@@ -147,7 +168,11 @@ def train_variational_sde(
             x_seq = x_seq.to(device=device, dtype=torch.float32)
             t_seq = t_seq.to(device=device, dtype=torch.float32)
             context = context.to(device=device, dtype=torch.float32)
-            mask_tensor = mask.to(device=device, dtype=torch.float32) if isinstance(mask, torch.Tensor) else None
+            mask_tensor = (
+                mask.to(device=device, dtype=torch.float32)
+                if isinstance(mask, torch.Tensor)
+                else None
+            )
 
             optim.zero_grad(set_to_none=True)
             loss, stats = model.compute_elbo(
@@ -175,6 +200,12 @@ def train_variational_sde(
         scheduler.step()
         avg_loss = running / max(1, total)
         if ckpt_dir is not None:
-            save_checkpoint(model, optim, f"{ckpt_dir}/vsde_epoch{epoch}.pt", epoch=epoch, loss=avg_loss)
+            save_checkpoint(
+                model,
+                optim,
+                f"{ckpt_dir}/vsde_epoch{epoch}.pt",
+                epoch=epoch,
+                loss=avg_loss,
+            )
 
     return model

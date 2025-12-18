@@ -1,0 +1,7 @@
+
+\begin{abstract}
+   We present PIVONet (\emph{P}hysically-\emph{I}nformed \emph{V}ariational \emph{O}DE \emph{N}eural \emph{Net}work), a unified framework that integrate Neural Ordinary Differential Equations (Neuro-ODEs) with Continuous Normalizing Flows (CNFs) for stochastic fluid simulation and visualization. 
+    First, we demonstrate that a physically informed model, parameterized by CNF parameters $\theta$, can be trained offline to yield an efficient surrogate simulator for a specific fluid system, eliminating the need to explicitly simulate the full dynamics. 
+    Second, by introducing a variational model with parameters $\phi$ that captures latent stochasticity in observed fluid trajectories, we model the network output as a variational distribution and optimize a pathwise Evidence Lower Bound (ELBO), enabling stochastic ODE integration that captures turbulence and random fluctuations in fluid motion (advection-diffusion behaviors).
+
+\end{abstract}
