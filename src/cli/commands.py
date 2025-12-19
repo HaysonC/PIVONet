@@ -2,17 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from pathlib import Path
+import shutil
 from typing import Protocol
 
-import numpy as np
-
-from ..cfd.particle_trajectories import ParticleTrajectorySimulator
-from ..interfaces.data_sources import NpyVelocityFieldSource
 from ..interfaces.launch_options import LaunchOptions
-from ..interfaces.trajectories import TrajectoryResult
-from ..utils.config import load_config
 from ..utils.paths import resolve_data_path
 from ..utils.trajectory_io import load_trajectory_bundle
 from ..utils.modeling import (
@@ -21,6 +15,7 @@ from ..utils.modeling import (
     train_from_bundle,
 )
 from ..visualization import TrajectoryPlotter, VelocityFieldPlotter
+from ..utils.paths import project_root
 
 
 class InteractionChannel(Protocol):
@@ -48,61 +43,47 @@ class InteractionChannel(Protocol):
         ...
 
 
-def _ensure_npz(path: Path) -> Path:
-    return path if path.suffix == ".npz" else path.with_suffix(".npz")
-
-
-def _default_trajectory_path(particles: int) -> Path:
-    timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
-    filename = f"trajectories_n{particles}_{timestamp}.npz"
-    return resolve_data_path("cfd", "trajectories", filename, create=True)
-
-
 def _default_plot_path(input_path: str, subdir: str) -> Path:
     base = Path(input_path).stem or "output"
     filename = f"{base}.png"
     return resolve_data_path("cfd", subdir, filename, create=True)
 
 
-def _monitor_trajectory(result: TrajectoryResult, channel: InteractionChannel) -> None:
-    steps = result.history.shape[0] - 1
-    channel.say(f"Simulated {result.num_particles} particles for {steps} timesteps.")
+def run_import(options: LaunchOptions, channel: InteractionChannel) -> Path:
+    assert options.import_data_source, "Import requires a dataset source folder."
+    assert options.import_data_flow, "Import requires a flow name."
 
+    source = Path(options.import_data_source).expanduser().resolve()
+    if not source.exists() or not source.is_dir():
+        raise FileNotFoundError(f"Dataset folder does not exist: {source}")
 
-def run_import(options: LaunchOptions, channel: InteractionChannel) -> TrajectoryResult:
-    channel.say("I will import velocity snapshots and start the particle simulation.")
-    config = load_config()
-    source = NpyVelocityFieldSource(config.velocity_dir)
-    simulator = ParticleTrajectorySimulator(
-        velocity_source=source,
-        diffusion_coefficient=config.diffusion_constant,
-        dt=options.dt,
-        seed=None,
-    )
-    result = simulator.simulate(
-        num_particles=options.particles, max_steps=options.max_steps
-    )
-    _monitor_trajectory(result, channel)
-
-    if options.output_path:
-        requested = Path(options.output_path).expanduser()
-        output_path = (
-            requested
-            if requested.is_absolute()
-            else resolve_data_path(*requested.parts, create=True)
+    velocity_dir = source / "velocity"
+    if not velocity_dir.exists() or not velocity_dir.is_dir():
+        raise ValueError(
+            f"Dataset folder must contain a velocity/ subfolder: {source}"
         )
-    else:
-        output_path = _default_trajectory_path(options.particles)
-    output_path = _ensure_npz(output_path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    np.savez(
-        output_path, history=result.history, timesteps=np.asarray(result.timesteps)
+
+    dest_flow_dir = (project_root() / "data" / options.import_data_flow).resolve()
+    channel.say(
+        f"Copying dataset into data/{options.import_data_flow}/ ..."
     )
 
-    channel.success(f"History saved to [bold green]{output_path}[/].")
+    dest_flow_dir.parent.mkdir(parents=True, exist_ok=True)
+    if dest_flow_dir.exists():
+        if options.import_data_overwrite:
+            shutil.rmtree(dest_flow_dir)
+        else:
+            raise FileExistsError(
+                f"Target already exists: {dest_flow_dir} (re-run with overwrite enabled)"
+            )
+
+    shutil.copytree(source, dest_flow_dir)
+    channel.success(
+        f"Imported dataset to [bold green]{dest_flow_dir}[/] (expects velocity/ inside)."
+    )
     channel.hint(options)
-    channel.remember_path("trajectory_bundle", output_path)
-    return result
+    channel.remember_path("import_data_source", source)
+    return dest_flow_dir
 
 
 def run_visualize(options: LaunchOptions, channel: InteractionChannel) -> None:
@@ -120,6 +101,7 @@ def run_visualize(options: LaunchOptions, channel: InteractionChannel) -> None:
 
 
 def run_velocity(options: LaunchOptions, channel: InteractionChannel) -> None:
+    """Deprecated: retained for Streamlit UI compatibility."""
     assert options.input_path, "Velocity plot command needs an input .npy file."
     channel.say("Sampling the velocity field and sketching the flow.")
     plotter = VelocityFieldPlotter(sample_points=options.velocity_samples)
@@ -160,22 +142,70 @@ def run_modeling(
     return outcome
 
 
-def run_viewer(options: LaunchOptions, channel: InteractionChannel) -> None:
-    assert options.viewer_dataset, "Viewer command requires a dataset name."
-    channel.say("Launching the Taichi particle trajectory viewer.")
-    try:
-        from ..visualization.viewer_taichi import main as viewer_main
-    except ImportError:
-        channel.say(
-            "Taichi is not installed. Please install it with: pip install taichi"
-        )
-        return
-    import sys
+def run_import_model(options: LaunchOptions, channel: InteractionChannel) -> Path:
+    assert options.import_model_source, "Import model requires a source path."
 
-    # Simulate command line args
-    sys.argv = ["viewer_taichi.py", "--dataset", options.viewer_dataset]
-    try:
-        viewer_main()
-    except Exception as e:
-        channel.say(f"Viewer exited with error: {e}")
+    source = Path(options.import_model_source).expanduser().resolve()
+    checkpoints_root = (project_root() / "cache" / "checkpoints").resolve()
+
+    # If target is omitted, treat source as a bundle containing multiple checkpoint folders.
+    target_dir = (
+        (checkpoints_root / options.import_model_target).resolve()
+        if options.import_model_target
+        else checkpoints_root
+    )
+
+    channel.say("Importing pretrained checkpoints into cache/checkpoints...")
+
+    if not source.exists():
+        raise FileNotFoundError(f"Source path does not exist: {source}")
+
+    checkpoints_root.mkdir(parents=True, exist_ok=True)
+
+    if options.import_model_target is None:
+        if not source.is_dir():
+            raise ValueError(
+                "Bundle import requires a directory source (containing one or more checkpoint folders)."
+            )
+        # Copy every immediate child directory into cache/checkpoints/<child>.
+        copied: list[Path] = []
+        for child in sorted(source.iterdir()):
+            if not child.is_dir():
+                continue
+            dest = (checkpoints_root / child.name).resolve()
+            if dest.exists():
+                if options.import_model_overwrite:
+                    shutil.rmtree(dest)
+                else:
+                    continue
+            shutil.copytree(child, dest)
+            copied.append(dest)
+
+        if not copied:
+            raise ValueError(
+                f"No checkpoint folders found under {source}. Expected subfolders like '2d-euler-vortex_cnf'."
+            )
+        channel.success(
+            "Imported checkpoint folders:\n" + "\n".join(f"- {p}" for p in copied)
+        )
+        channel.hint(options)
+        return checkpoints_root
+
+    # Single-target import
+    assert options.import_model_target, "Import model requires a target name for single-folder imports."
+    if target_dir.exists() and options.import_model_overwrite:
+        shutil.rmtree(target_dir)
+
+    if source.is_dir():
+        if target_dir.exists() and not options.import_model_overwrite:
+            raise FileExistsError(
+                f"Target already exists: {target_dir} (re-run with overwrite enabled)"
+            )
+        shutil.copytree(source, target_dir)
+    else:
+        target_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target_dir / source.name)
+
+    channel.success(f"Imported model assets to [bold green]{target_dir}[/].")
     channel.hint(options)
+    return target_dir

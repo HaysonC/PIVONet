@@ -1,10 +1,9 @@
 # VERSION
-version: '1.1.22 Batre'
+version: '1.2.1 San Antonio'
 
+
+# LEGACY PARAMETERS
 simulation:
   diffusion_constant: 0.02
   pyfr_backend: metal
   pyfr_case: tests/cfd/pyfr-backend/test-flows/2d-double-mach-reflection
-  # The following directory- and trajectory-related settings are experiment-specific
-  # and have been moved into individual experiment YAMLs. Defaults will still be
-  # provided by the code when missing.

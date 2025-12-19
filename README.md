@@ -41,9 +41,10 @@ Classical CFD solvers are computationally expensive (hours to days for complex g
 - **Efficient**: Adjoint-method training reduces memory from O(steps) to O(1)
 - **Flexible**: Works with any velocity field source (PyFR, analytical, pre-computed)
 - **Reproducible**: YAML-driven experiment pipelines with checkpoint management
-- **Interactive Visualization**: GPU-accelerated 3D trajectory viewer (Taichi)
 
----
+> [!WARNING]
+> The Streamlit GUI is experimental and not recommended.
+> When you run `pivo`, you will be prompted to choose **CLI** or **GUI** — choose **CLI**.
 
 ## Quick Start
 
@@ -58,27 +59,36 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-For the interactive 3D viewer (optional):
-
-```bash
-pip install taichi
-```
-
 ### Your First Simulation (2 minutes)
 
 ```bash
 # Launch interactive CLI
 pivo
-
-# Or run a predefined experiment
-pivo --run-experiment demo-baseline
 ```
+
+> [!WARNING]
+> You will be prompted to choose **CLI** or **GUI**.
+> The GUI is experimental — choose **CLI**.
+
+> [!NOTE]
+> Pretrained checkpoints and example data are available here:
+> https://drive.google.com/drive/folders/13ykGleAmZTNAz1lhR0x6FekYqyGYbper?usp=sharing
+
+In the conversational CLI:
+
+1. Choose `import` → **Model checkpoints (pretrained)** and select the downloaded folder. It would be under pretrained in the drive.
+2. Choose `experiment` and select the dataset you imported checkpoints for (e.g. `2d-euler-vortex`).
+3. When a training step detects an existing checkpoint, choose **Skip step (reuse cached checkpoint)**.
+   - This runs inference using the imported pretrained models.
+
+> [!TIP]
+> Use `pivo --cli` to skip the interface prompt.
 
 Expected output:
 
-- Simulated particle trajectories saved as `.npz` bundle
-- Console progress indicators with timing
-- Artifact files in `cache/artifacts/` or `cache/checkpoints/`
+- Console-guided experiment run (no flags needed)
+- Checkpoints detected under `cache/checkpoints/` and reused when you choose **Skip step**
+- Inference outputs and plots written under `cache/artifacts/` (varies by experiment)
 
 ### Quick Tips
 
@@ -160,7 +170,6 @@ Expected output:
 ┌──────────────────────────▼──────────────────────────────────────┐
 │ 5. Inference & Visualization                                    │
 │   • Generate trajectory animations (GIF/MP4)                    │
-│   • Interactive 3D viewer with Taichi                           │
 │   • Plot loss curves and trajectory metrics                     │
 │   • Export results for downstream analysis                      │
 └─────────────────────────────────────────────────────────────────┘
@@ -193,7 +202,7 @@ TrajectoryResult (immutable)
                 │
                 ├─ Static plots (matplotlib)
                 ├─ Animations (matplotlib animation)
-                └─ Taichi 3D viewer
+            └─ (Optional) interactive viewer (deprecated)
 ```
 
 ---
@@ -219,9 +228,6 @@ pip install -r requirements.txt
 # Install PIVONet in editable mode
 pip install -e .
 
-# Optional: For 3D interactive viewer
-pip install taichi
-
 # Optional: For PyFR CFD simulations
 pip install pyfr[backend]  # Backend = 'cuda', 'openmp', 'opencl'
 
@@ -246,6 +252,9 @@ pivo --help
 
 ## Usage Modes
 
+> [!WARNING]
+> The GUI mode is unstable/experimental. Use the CLI.
+
 ### 1. Conversational CLI
 
 Start the interactive CLI:
@@ -256,11 +265,10 @@ pivo
 
 Menu options:
 
-- **Import Velocities**: Load CFD snapshots, configure particles, simulate
-- **Train Models**: Load trajectory bundle, configure network, train
-- **Visualize Results**: Generate plots, animations, interactive viewer
+- **Import**: Choose **Flow data** (copy a dataset folder with `velocity/` into `data/<flow-name>/`) or **Model checkpoints (pretrained)**
+- **Visualize**: Generate plots for trajectory bundles
+- **Model**: Train encoder + CNF on trajectories
 - **Run Experiments**: Execute YAML-defined pipelines
-- **Browse History**: View saved runs and checkpoints
 
 ### 2. Programmatic API
 
@@ -299,13 +307,16 @@ python -m src.workflows.train_cnf \
     --trajectory data/demo/trajectories.npz \
     --epochs 100 \
     --output-dir cache/checkpoints/cnf_run1
-
-# Render velocity animations
-python -m src.workflows.render_velocity_animations \
-    --velocity-dir data/2d-euler-vortex/velocity \
-    --output-dir cache/artifacts/ \
-    --fps 12
 ```
+
+> [!TIP]
+> Pretrained inference workflow:
+>
+> 1) Download checkpoints/data from:
+>    https://drive.google.com/drive/folders/13ykGleAmZTNAz1lhR0x6FekYqyGYbper?usp=sharing
+> 2) Run `pivo` → `import` → `Model checkpoints (pretrained)` and import the folder.
+> 3) Run `pivo` → `experiment` and select the corresponding dataset.
+> 4) When prompted during training steps, choose **Skip step (reuse cached checkpoint)** to jump straight to inference.
 
 ### 5. YAML Experiment Pipelines
 
@@ -335,10 +346,10 @@ steps:
 Run it:
 
 ```bash
-pivo --run-experiment my-experiment
+## Recommended: run via the conversational CLI
+pivo
 
-# With overrides
-pivo --run-experiment my-experiment --overrides particles=500 epochs=200
+# Then choose: experiment → my-experiment
 ```
 
 ---
@@ -656,14 +667,14 @@ class AnalyticalVortexSource(VelocityFieldSource):
         r_sq = x**2 + y**2
         # Avoid singularity at origin
         r_sq = np.maximum(r_sq, 1e-6)
-    
+  
         # Circulation velocity: v_theta = Gamma / (2*pi*r)
         v_theta = 1.0 / (2 * np.pi * np.sqrt(r_sq))
-    
+  
         # Convert to Cartesian
         vx = -v_theta * y / np.sqrt(r_sq)
         vy = v_theta * x / np.sqrt(r_sq)
-    
+  
         return np.stack([vx, vy], axis=-1)
 
 # Use custom source
@@ -671,35 +682,6 @@ velocity_source = AnalyticalVortexSource()
 simulator = ParticleTrajectorySimulator(velocity_source=velocity_source)
 result = simulator.simulate(n_particles=100, max_steps=50, dt=0.01)
 ```
-
-### Example 3: Batch Processing Multiple Flows
-
-```bash
-# Scan all flows and generate animations
-python -m src.workflows.render_velocity_animations \
-    --velocity-root data/ \
-    --output-dir cache/artifacts/batch_run \
-    --vector-stride 3 \
-    --fps 12 \
-    --device auto
-```
-
-### Example 4: Interactive 3D Viewer
-
-```bash
-# Launch GPU-accelerated 3D viewer for a flow
-python -m src.visualization.viewer_taichi \
-    --dataset 2d-euler-vortex \
-    --cnf-checkpoint cache/checkpoints/2d-euler-vortex_cnf/best.pt
-```
-
-Interactive controls:
-
-- `Space`: Play/pause
-- `Arrow keys`: Rotate camera
-- `Scroll`: Zoom
-- `P`: Cycle particle colors
-- `S`: Increase particle size
 
 ---
 
@@ -748,17 +730,13 @@ tspan = torch.linspace(0, 1, 10)  # ✓ Good
 
 **Solutions**:
 
-```bash
-python -m src.workflows.render_velocity_animations --velocity-dir data/2d-euler-vortex/velocity --output cache/artifacts/2d-euler-vortex/velocity_evolution.gif --save-preview --vector-stride 3 --fps 12 --device auto
-```
+Reduce batch size, reduce model width/depth, or switch to CPU/MPS if CUDA memory is limited.
 
-Omit `--velocity-dir` to let the script crawl `--velocity-root` (defaults to `data/`) and produce animations for every detected flow automatically. Pass `--device auto` (default) to prefer Apple MPS when PyTorch/MPS is available, falling back to CPU otherwise.
-
-Prefer YAML pipelines? Run `pivo --run-experiment velocity-animations` to sweep every flow using the orchestrator with Rich progress output.
+Prefer YAML pipelines? Run `pivo`, then choose `experiment` → `velocity-animations`.
 
 ### VSDE Inference Integrator Comparison
 
-`src/workflows/run_vsde_inference.py` now exposes a `--integrator` flag (choices: `euler`, `improved_euler`, `rk4`, `dopri5`) so you can target different drift solvers while diffusion always uses Euler–Maruyama. Run `pivo --run-experiment integrator-comparison` to execute inference with each integrator back-to-back and inspect the overlays living under `cache/artifacts/integrator-comparison/<method>`.
+`src/workflows/run_vsde_inference.py` now exposes a `--integrator` flag (choices: `euler`, `improved_euler`, `rk4`, `dopri5`) so you can target different drift solvers while diffusion always uses Euler–Maruyama. Use `pivo`, then choose `experiment` → `integrator-comparison` to execute inference with each integrator back-to-back and inspect the overlays living under `cache/artifacts/integrator-comparison/<method>`.
 
 The final step of the experiment runs `src/experiments/scripts/compare_integrators.py`, which produces `cache/artifacts/integrator-comparison/charts/comparison_mae.png` plus a summary JSON detailing the VSDE/CNF MAE per integrator.
 
@@ -788,25 +766,6 @@ If you use PIVONet in your research, please cite:
   url={https://github.com/HaysonC/ODE_CNF_thermal_motion},
 }
 ```
-
----
-
-## Glossary
-
-
-| Term           | Definition                                                                       |
-| -------------- | -------------------------------------------------------------------------------- |
-| **CNF**        | Continuous Normalizing Flow; invertible neural ODE with tractable likelihood     |
-| **SDE**        | Stochastic Differential Equation; probabilistic dynamical system                 |
-| **ODE**        | Ordinary Differential Equation; deterministic dynamical system                   |
-| **Adjoint**    | Gradient computation via reverse-mode AD; memory-efficient for long trajectories |
-| **Trajectory** | Sequence of positions over time under velocity field                             |
-| **PyFR**       | Open-source CFD solver; simulates fluid flow on unstructured grids               |
-| **Langev in**  | Stochastic dynamics with friction and noise; models diffusion                    |
-| **Checkpoint** | Saved model weights and optimizer state for resumption                           |
-| **YAML**       | Human-readable configuration format; used for experiment specifications          |
-
----
 
 ## Questions?
 

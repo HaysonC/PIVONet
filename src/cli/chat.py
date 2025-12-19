@@ -35,7 +35,7 @@ class FlowChat:
         banner = Panel(
             "[bold cyan]Hi there! I'm PIVO. Tell me what you'd like to do today.[/]",
             title="PIVO CLI",
-            subtitle="(import | visualize | velocity | model | experiment | exit)",
+            subtitle="(import | visualize | model | experiment | exit)",
         )
         self.console.print(banner)
         self.console.print(

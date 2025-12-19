@@ -27,6 +27,7 @@ commands.py:
     train() → Model training workflow
     visualize() → Result visualization workflow
     import_trajectories() → Import velocity snapshots
+    import_model() → Copy pretrained checkpoints into cache/checkpoints
     Each returns InteractionChannel for error/warning messaging
 
 chat.py:

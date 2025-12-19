@@ -3,7 +3,12 @@ venv/
 __pycache__/
 
 .vscode/
-data/
+data/*
+!data/
+!data/empty.txt
+
+
+
 
 # jypyter notebook
 .ipynb_checkpoints
@@ -18,8 +23,9 @@ __pycache__/
 dist/   
 
 checkpoints/
-cache/
-# exclude cache/empty file
+cache/*
+!cache/
+!cache/.gitkeep
 !cache/empty.txt
 
 # PyFR mesh and solution files
@@ -52,3 +58,4 @@ cache/
 *.ind
 *.lof
 *.lot
+

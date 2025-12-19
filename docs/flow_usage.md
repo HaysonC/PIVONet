@@ -4,27 +4,51 @@ This document walks through the supported interfaces of the Flow project and sha
 
 ## Core Entry Point
 
+> [!WARNING]
+> The GUI mode is experimental and not recommended.
+> When you run `pivo`, you will be prompted to choose **CLI** or **GUI** — choose **CLI**.
+
 - Install the package (and expose the `pivo` command) with `python -m pip install -e .` during development or `python -m pip install .` for a standard install.
 - Run `pivo` from any shell to open the conversational CLI immediately.
 - Run `source venv/bin/activate` and then `./main.sh` to run the preflight checks, install requirements, and launch the Python entry point.
 - The shell script now leaves you inside your default shell if preflight questions fail so you can inspect the message or rerun commands.
-- To launch YAML-driven experiments, run `pivo` and pick **experiment**, or call `pivo --list-experiments` / `pivo --run-experiment <slug>` directly. YAML files live in `src/experiments/` alongside any helper scripts.
+
+> [!IMPORTANT]
+> To run experiments, just run `pivo` and pick **experiment** in the conversational menu.
+> That is the intended path (no extra flags needed).
+
+> [!NOTE]
+> Pretrained checkpoints and example data are available here:
+> https://drive.google.com/drive/folders/13ykGleAmZTNAz1lhR0x6FekYqyGYbper?usp=sharing
 
 ## Conversational CLI
 
-- Commands: `import`, `visualize`, `velocity`, and `model`.
+- Commands: `import`, `visualize`, `model`, and `experiment`.
 - Use the interactive prompts to adjust particle counts, sampling steps, or encoder/CNF training hyperparameters. Defaults come from `config.yml`.
 - After every command, Flow prints a recap and command hint (`flow-cli <command> ...`) plus this guide path so you can script a repeatable invocation.
 - Errors show a friendly message and a pointer to this guide.
-- When a prompt asks for a bundle or velocity path you just processed, leave the question blank and Flow will reuse the last result automatically.
+- When a prompt asks for a bundle path you just processed, leave the question blank and Flow will reuse the last result automatically.
+
+> [!IMPORTANT]
+> The `import` menu has two sub-options:
+> - **Flow data**: copy a downloaded dataset folder (must include `velocity/`) into `data/<flow-name>/`.
+> - **Model checkpoints (pretrained)**: copy downloaded checkpoint folders into `cache/checkpoints/`.
 
 ## Command Descriptions
 
-1. **Import**: ingest PyFR-generated velocity snapshots, simulate particles, and save trajectories under `data/cfd/trajectories/`.
+1. **Import**:
+	- **Flow data**: copy a downloaded dataset folder (must include `velocity/`) into `data/<flow-name>/` so experiments can run.
+	- **Model checkpoints (pretrained)**: import a downloaded checkpoint bundle so you can run inference without retraining.
 2. **Visualize**: plot an exported trajectory bundle with optional velocity overlay.
-3. **Velocity**: sample a raw velocity `.npy` snapshot and draw an arrow field.
-4. **Model**: fit the diffusion encoder and CNF on a saved trajectory bundle. The resulting checkpoints land in `cache/modeling/<run_tag>/` and you can rerun the same configuration by copying the hint line.
-5. **Experiment**: choose a YAML pipeline (e.g., `demo-baseline`) and let the orchestrator run each scripted step with labeled device-aware progress bars.
+3. **Model**: fit the diffusion encoder and CNF on a saved trajectory bundle. The resulting checkpoints land in `cache/modeling/<run_tag>/` and you can rerun the same configuration by copying the hint line.
+4. **Experiment**: choose a YAML pipeline (e.g., `2d-euler-vortex`) and let the orchestrator run each scripted step with labeled device-aware progress bars.
+
+> [!TIP]
+> Pretrained inference workflow:
+> 1) Download checkpoints from the Google Drive link.
+> 2) Run `pivo` → `import` → `Model checkpoints (pretrained)` and select the downloaded folder.
+> 3) Run `pivo` → `experiment` and select the corresponding dataset.
+> 4) When training steps detect existing checkpoints, choose **Skip step (reuse cached checkpoint)**.
 
 ## Helpful Tips
 
@@ -34,22 +58,9 @@ This document walks through the supported interfaces of the Flow project and sha
 
 Refer here whenever you need a refresher—Flow will remind you of this guide after each run so automation is painless.
 
-## Velocity Animation Workflow
-
-Need a quick QA pass on the CFD velocity fields themselves? Run the Rich-enabled workflow helper to build quiver animations straight from the `.npy` snapshots:
-
-```bash
-python -m src.workflows.render_velocity_animations --velocity-dir data/2d-viscous-shock-tube/velocity --output cache/artifacts/2d-viscous-shock-tube/velocity_evolution.gif --save-preview --device auto
-```
-
-- Omit `--velocity-dir` to let the script crawl `--velocity-root` (defaults to `data/`) and render every flow it finds.
-- The orchestrator-compatible CLI flags mean you can add the helper as a YAML experiment step (see `velocity-animation` in the packaged pipelines).
-- `--device auto` prefers Apple MPS when PyTorch/MPS is present but gracefully falls back to CPU.
-- A fully automated pipeline ships as `pivo --run-experiment velocity-animations`, which scans the default data root and writes GIFs + previews to `cache/artifacts/<flow>/`.
-
 ## VSDE Inference Integrator Comparison
 
-Pass `--integrator` (`euler`, `improved_euler`, `rk4`, or `dopri5`) to `src/workflows/run_vsde_inference.py` to swap the deterministic drift solver while diffusion noise still uses Euler–Maruyama. Run `pivo --run-experiment integrator-comparison` to execute inference with every integrator and compare overlays under `cache/artifacts/integrator-comparison/<method>`. You can also call the workflow directly with your preferred integrator flag when reproducing specific solver behavior.
+Pass `--integrator` (`euler`, `improved_euler`, `rk4`, or `dopri5`) to `src/workflows/run_vsde_inference.py` to swap the deterministic drift solver while diffusion noise still uses Euler–Maruyama. Use `pivo` → `experiment` → `integrator-comparison` to run the sweep and inspect overlays under `cache/artifacts/integrator-comparison/<method>`.
 
 The experiment now ends with a `compare_integrators.py` helper that compiles the MAE metrics across the runs and writes `comparison_mae.png` plus `comparison_summary.json` under `cache/artifacts/integrator-comparison/charts/`.
 

@@ -34,31 +34,39 @@ class LaunchOptions:
     cnf_steps: int = 6
     cnf_lr: float = 2e-4
     cnf_hidden_dim: int = 128
-    # Viewer options
+    # Import flow-data options (repurposed legacy trajectory import)
+    import_data_source: Path | None = None
+    import_data_flow: str | None = None
+    import_data_overwrite: bool = False
+    # Import model options
+    import_model_source: Path | None = None
+    import_model_target: str | None = None
+    import_model_overwrite: bool = False
+
+    # Viewer options (deprecated)
     viewer_dataset: str | None = None
 
     def command_hint(self) -> str:
         short = f"flow-cli {self.command}"
         args = []
         if self.command == "import":
-            args.extend(
-                [
-                    f"--particles {self.particles}",
-                    f"--dt {self.dt}",
-                ]
-            )
-            if self.max_steps:
-                args.append(f"--steps {self.max_steps}")
-            if self.run_name:
-                args.append(f"--run-name {self.run_name}")
+            if self.import_data_source:
+                args.append(f"--source {self.import_data_source}")
+            if self.import_data_flow:
+                args.append(f"--flow {self.import_data_flow}")
+            if self.import_data_overwrite:
+                args.append("--overwrite")
         elif self.command == "visualize" and self.input_path:
-            args.append(f"--input {self.input_path}")
-        elif self.command == "velocity" and self.input_path:
             args.append(f"--input {self.input_path}")
         elif self.command == "model" and self.model_input_path:
             args.append(f"--input {self.model_input_path}")
-        if self.command == "viewer" and self.viewer_dataset:
-            args.append(f"--dataset {self.viewer_dataset}")
+        elif self.command == "import-model":
+            if self.import_model_source:
+                args.append(f"--source {self.import_model_source}")
+            if self.import_model_target:
+                args.append(f"--target {self.import_model_target}")
+            if self.import_model_overwrite:
+                args.append("--overwrite")
         if self.command == "model":
             args.extend(
                 [
@@ -76,4 +84,5 @@ class LaunchOptions:
 
     @classmethod
     def conversational_commands(cls) -> Iterable[str]:
-        return ("import", "visualize", "velocity", "model", "viewer")
+        # Streamlit UI uses this list; the conversational CLI uses its own menu.
+        return ("import", "visualize", "velocity", "model")

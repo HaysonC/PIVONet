@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Sequence
 
 import questionary
+import yaml
 
 from ..interfaces.config import SimulationConfig
 from ..interfaces.launch_options import LaunchOptions
@@ -15,10 +16,10 @@ from ..utils.config import load_config
 from ..utils.console_gate import prompt_gate
 from ..main import welcome_message
 from .chat import FlowChat
-from .commands import run_import, run_velocity, run_visualize, run_modeling, run_viewer
+from .commands import run_import, run_visualize, run_modeling, run_import_model
 from ..utils.orchestrator import ExperimentOrchestrator
 
-CLI_COMMANDS = ("import", "visualize", "velocity", "model", "viewer", "experiment")
+CLI_COMMANDS = ("import", "visualize", "model", "experiment")
 
 
 def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -81,15 +82,14 @@ def run_conversational_cli(
 
         try:
             if command == "import":
-                run_import(options, chat)
+                if options.command == "import-model":
+                    run_import_model(options, chat)
+                else:
+                    run_import(options, chat)
             elif command == "visualize":
                 run_visualize(options, chat)
-            elif command == "velocity":
-                run_velocity(options, chat)
             elif command == "model":
                 run_modeling(options, chat)
-            elif command == "viewer":
-                run_viewer(options, chat)
         except Exception as error:  # pragma: no cover - interactive shell
             chat.wrap_error(error, options)
 
@@ -104,49 +104,115 @@ def _collect_options(
     command: str, chat: FlowChat, config: SimulationConfig
 ) -> LaunchOptions:
     if command == "import":
-        return _import_options(chat, config)
+        return _import_menu_options(chat, config)
     if command == "visualize":
         return _visualize_options(chat)
-    if command == "velocity":
-        return _velocity_options(chat)
     if command == "model":
         return _modeling_options(chat)
-    if command == "viewer":
-        return _viewer_options(chat)
     raise ValueError(f"Unsupported command: {command}")
 
 
-def _import_options(chat: FlowChat, config: SimulationConfig) -> LaunchOptions:
-    particles = _ask_int(
-        chat,
-        "How many particles should we trace?",
-        default=config.trajectory_particles,
-    )
-    max_steps = _ask_int(
-        chat,
-        "Maximum velocity snapshots to absorb (leave blank for unlimited):",
-        default=None,
-        allow_blank=True,
-    )
-    dt = _ask_float(chat, "Integration timestep (dt)", default=config.trajectory_dt)
-    output_path = _ask_path(
-        chat, "Output file path for the trajectory bundle (optional)"
-    )
+def _import_menu_options(chat: FlowChat, config: SimulationConfig) -> LaunchOptions:
+    """Import menu entry.
+
+    Provides two import paths under the single `import` command:
+    - Flow data: copy a downloaded dataset folder (must include velocity/) into data/<flow>/.
+    - Model checkpoints: copy downloaded pretrained checkpoints into cache/checkpoints.
+    """
+
     with prompt_gate():
-        run_name = (
-            questionary.text("Optional run name for logging", default="").ask() or ""
+        choice = questionary.select(
+            "What would you like to import?",
+            choices=[
+                questionary.Choice(title="Flow data (copy velocity snapshots)", value="data"),
+                questionary.Choice(title="Model checkpoints (pretrained)", value="model"),
+            ],
+        ).ask()
+
+    if choice == "model":
+        return _import_model_options(chat)
+    return _import_options(chat, config)
+
+
+def _import_flow_targets() -> list[str]:
+    """Suggest flow names based on existing data folders and experiment yamls."""
+
+    targets: set[str] = set()
+
+    data_root = Path("data")
+    if data_root.exists():
+        for child in data_root.iterdir():
+            if child.is_dir() and not child.name.startswith("."):
+                targets.add(child.name)
+
+    experiments_dir = Path("src/experiments")
+    if experiments_dir.exists():
+        for yaml_path in sorted(experiments_dir.glob("*.yaml")):
+            try:
+                text = yaml_path.read_text(encoding="utf-8")
+            except Exception:
+                continue
+            # Cheap parse: collect occurrences of `data/<flow>/velocity`.
+            for fragment in text.split("data/")[1:]:
+                flow = fragment.split("/", 1)[0].strip()
+                if not flow:
+                    continue
+                if all(c.isalnum() or c in {"-", "_"} for c in flow):
+                    targets.add(flow)
+
+    return sorted(targets)
+
+
+def _import_options(chat: FlowChat, config: SimulationConfig) -> LaunchOptions:
+    chat.say(
+        "Point me at a dataset folder (it must contain a velocity/ subfolder). "
+        "I'll copy it into this repo under data/<flow-name>/."
+    )
+
+    while True:
+        source_path = _ask_path(
+            chat,
+            "Path to dataset folder (contains velocity/)",
+            required=True,
+            default_key="import_data_source",
+        )
+        assert source_path is not None
+        source = source_path.expanduser().resolve()
+        velocity_dir = source / "velocity"
+        if velocity_dir.exists() and velocity_dir.is_dir():
+            break
+        chat.say(
+            f"That folder doesn't look like a Flow dataset: missing velocity/ under {source}. Try again."
         )
 
-    assert particles is not None, "I cannot proceed without a particle count."
+    default_flow = source.name
+    flow_choices = _import_flow_targets()
+    with prompt_gate():
+        if flow_choices:
+            flow = questionary.autocomplete(
+                "Flow name (copied under data/<flow-name>/)",
+                choices=flow_choices,
+                default=default_flow,
+            ).ask()
+        else:
+            flow = questionary.text(
+                "Flow name (copied under data/<flow-name>/)",
+                default=default_flow,
+            ).ask()
+
+        overwrite = questionary.confirm(
+            "Overwrite existing data/<flow-name>/ if it already exists?",
+            default=False,
+        ).ask()
+
+    if not flow or not flow.strip():
+        raise KeyboardInterrupt
 
     return LaunchOptions(
         command="import",
-        particles=particles,  #
-        max_steps=max_steps,
-        dt=dt,
-        diffusion_constant=config.diffusion_constant,
-        output_path=output_path,
-        run_name=run_name.strip() or None,
+        import_data_source=source,
+        import_data_flow=flow.strip(),
+        import_data_overwrite=bool(overwrite),
     )
 
 
@@ -172,26 +238,6 @@ def _visualize_options(chat: FlowChat) -> LaunchOptions:
         max_particles=max_particles,
         output_path=output_path,
         flow_overlay=flow_overlay,
-    )
-
-
-def _velocity_options(chat: FlowChat) -> LaunchOptions:
-    input_path = _ask_path(
-        chat,
-        "Path to a velocity field snapshot (.npy)",
-        required=True,
-        default_key="velocity_field",
-    )
-    samples = _ask_int(chat, "Number of velocity samples", default=50_000)
-    output_path = _ask_path(chat, "Optional path for the velocity visualization")
-
-    assert samples is not None, "I cannot proceed without a sample count."
-
-    return LaunchOptions(
-        command="velocity",
-        input_path=input_path,
-        velocity_samples=samples,
-        output_path=output_path,
     )
 
 
@@ -234,17 +280,86 @@ def _modeling_options(chat: FlowChat) -> LaunchOptions:
     )
 
 
-def _viewer_options(chat: FlowChat) -> LaunchOptions:
+def _import_model_targets() -> list[str]:
+    """Return candidate folder names under cache/checkpoints.
+
+    We derive defaults from:
+    - `cache/checkpoints/<name>` folders already present locally.
+    - Any `cache/checkpoints/...` occurrences inside `src/experiments/*.yaml`.
+    """
+
+    targets: set[str] = set()
+
+    def collect(obj: object) -> None:
+        if isinstance(obj, dict):
+            for value in obj.values():
+                collect(value)
+        elif isinstance(obj, list):
+            for value in obj:
+                collect(value)
+        elif isinstance(obj, str) and "cache/checkpoints/" in obj:
+            marker = "cache/checkpoints/"
+            tail = obj.split(marker, 1)[1]
+            folder = tail.split("/", 1)[0].strip()
+            if folder:
+                targets.add(folder)
+
+    experiments_dir = Path("src/experiments")
+    if experiments_dir.exists():
+        for experiment in sorted(experiments_dir.glob("*.yaml")):
+            try:
+                collect(yaml.safe_load(experiment.read_text()))
+            except Exception:
+                continue
+
+    ckpt_root = Path("cache/checkpoints")
+    if ckpt_root.exists():
+        for child in ckpt_root.iterdir():
+            if child.is_dir():
+                targets.add(child.name)
+
+    return sorted(targets)
+
+
+def _import_model_options(chat: FlowChat) -> LaunchOptions:
+    source_path = _ask_path(
+        chat,
+        "Path to a downloaded checkpoint folder OR a single .pt file",
+        required=True,
+        default_key="import_model_source",
+    )
+    targets = _import_model_targets()
+
     with prompt_gate():
-        dataset = questionary.text(
-            "Dataset name (folder under ./data)", default="run_demo"
+        import_bundle = questionary.confirm(
+            "Does this folder contain MULTIPLE checkpoint folders (e.g. 2d-euler-vortex_cnf, 2d-euler-vortex_vsde, ...)?",
+            default=True,
         ).ask()
 
-    assert dataset, "Dataset name is required."
+    target: str | None = None
+    if not import_bundle:
+        with prompt_gate():
+            if targets:
+                target = questionary.select(
+                    "Target folder under cache/checkpoints/", choices=targets
+                ).ask()
+            else:
+                target = questionary.text(
+                    "Model name (folder under cache/checkpoints)", default="my-model"
+                ).ask()
+        assert target, "Target folder name is required."
+
+    with prompt_gate():
+        overwrite = questionary.confirm(
+            "Overwrite existing checkpoint folders if they already exist?",
+            default=False,
+        ).ask()
 
     return LaunchOptions(
-        command="viewer",
-        viewer_dataset=dataset.strip(),
+        command="import-model",
+        import_model_source=source_path,
+        import_model_target=str(target).strip() if target else None,
+        import_model_overwrite=bool(overwrite),
     )
 
 
