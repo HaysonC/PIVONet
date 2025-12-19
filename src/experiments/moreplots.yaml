@@ -17,7 +17,7 @@ steps:
       bundles:
         - data/2d-inc-cylinder/trajectories
       batch-size: 64
-      limit: 4096
+      limit: 256
       workers: 0
       cnf-checkpoint: cache/checkpoints/2d-inc-cylinder_cnf/cnf_latest.pt
       vsde-checkpoint: cache/checkpoints/2d-inc-cylinder_vsde/vsde_latest.pt
@@ -37,7 +37,7 @@ steps:
       bundles:
         - data/2d-euler-vortex/trajectories
       batch-size: 64
-      limit: 4096
+      limit: 256
       workers: 0
       cnf-checkpoint: cache/checkpoints/2d-euler-vortex_cnf/cnf_latest.pt
       vsde-checkpoint: cache/checkpoints/2d-euler-vortex_vsde/vsde_latest.pt
@@ -57,7 +57,7 @@ steps:
       bundles:
         - data/2d-viscous-shock-tube/trajectories
       batch-size: 64
-      limit: 4096
+      limit: 256
       workers: 0
       cnf-checkpoint: cache/checkpoints/2d-viscous-shock-tube_cnf/cnf_latest.pt
       vsde-checkpoint: cache/checkpoints/2d-viscous-shock-tube_vsde/vsde_latest.pt
