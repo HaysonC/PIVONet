@@ -1,0 +1,19 @@
+{
+  "runs": [
+    {
+      "label": "Viscous Shock Tube",
+      "count": 4096,
+      "vsde": {
+        "mean": 0.004953717624189835,
+        "median": 0.0041027432307600975,
+        "std": 0.0037092410896912885
+      },
+      "cnf": {
+        "mean": 0.006881059244412846,
+        "median": 0.005997802829369903,
+        "std": 0.0045438634073081295
+      }
+    }
+  ],
+  "plot": "cache/artifacts/moreplots/plots/mae_error_distributions.png"
+}

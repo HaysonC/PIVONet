@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2024) (preloaded format=pdflatex 2025.1.7)  18 DEC 2025 14:46
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2024) (preloaded format=pdflatex 2025.1.7)  19 DEC 2025 15:26
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -481,24 +481,34 @@ Package: amscd 2017/04/14 v2.1 AMS Commutative Diagrams
 \c@remark=\count310
 \c@example=\count311
 \c@assumption=\count312
+ (/usr/local/texlive/2024/texmf-dist/tex/latex/algorithms/algorithm.sty
+Package: algorithm 2009/08/24 v0.1 Document Style `algorithm' - floating environment
+ (/usr/local/texlive/2024/texmf-dist/tex/latex/float/float.sty
+Package: float 2001/11/08 v1.3d Float enhancements (AL)
+\c@float@type=\count313
+\float@exts=\toks48
+\float@box=\box75
+\@float@everytoks=\toks49
+\@floatcapt=\box76
+)
+\@float@every@algorithm=\toks50
+\c@algorithm=\count314
+)) (/usr/local/texlive/2024/texmf-dist/tex/latex/fancyhdr/fancyhdr.sty
+Package: fancyhdr 2022/11/09 v4.1 Extensive control of page headers and footers
+\f@nch@headwidth=\skip62
+\f@nch@O@elh=\skip63
+\f@nch@O@erh=\skip64
+\f@nch@O@olh=\skip65
+\f@nch@O@orh=\skip66
+\f@nch@O@elf=\skip67
+\f@nch@O@erf=\skip68
+\f@nch@O@olf=\skip69
+\f@nch@O@orf=\skip70
 ) (/usr/local/texlive/2024/texmf-dist/tex/latex/l3backend/l3backend-pdftex.def
 File: l3backend-pdftex.def 2024-02-20 L3 backend support: PDF output (pdfTeX)
-\l__color_backend_stack_int=\count313
-\l__pdf_internal_box=\box75
-) (./main.aux
-
-LaTeX Warning: Label `fig:placeholder' multiply defined.
-
-
-LaTeX Warning: Label `fig:placeholder' multiply defined.
-
-
-LaTeX Warning: Label `fig:placeholder' multiply defined.
-
-
-LaTeX Warning: Label `fig:placeholder' multiply defined.
-
-)
+\l__color_backend_stack_int=\count315
+\l__pdf_internal_box=\box77
+) (./main.aux)
 \openout1 = `main.aux'.
 
 LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 3.
@@ -519,17 +529,17 @@ LaTeX Font Info:    ... okay on input line 3.
 -- Lines per column: 56 (exact).
 (/usr/local/texlive/2024/texmf-dist/tex/context/base/mkii/supp-pdf.mkii
 [Loading MPS to PDF converter (version 2006.09.02).]
-\scratchcounter=\count314
+\scratchcounter=\count316
 \scratchdimen=\dimen301
-\scratchbox=\box76
-\nofMPsegments=\count315
-\nofMParguments=\count316
-\everyMPshowfont=\toks48
-\MPscratchCnt=\count317
+\scratchbox=\box78
+\nofMPsegments=\count317
+\nofMParguments=\count318
+\everyMPshowfont=\toks51
+\MPscratchCnt=\count319
 \MPscratchDim=\dimen302
-\MPnumerator=\count318
-\makeMPintoPDFobject=\count319
-\everyMPtoPDFconversion=\toks49
+\MPnumerator=\count320
+\makeMPintoPDFobject=\count321
+\everyMPtoPDFconversion=\toks52
 ) (/usr/local/texlive/2024/texmf-dist/tex/latex/epstopdf-pkg/epstopdf-base.sty
 Package: epstopdf-base 2020-01-24 v2.11 Base part for package epstopdf
 Package epstopdf-base Info: Redefining graphics rule for `.eps' on input line 485.
@@ -579,33 +589,33 @@ Package pdftex.def Info: figures/langevin.png  used on input line 12.
 
 
  <./figures/example1.png> <./figures/example2.png> <./figures/example3.png> <./figures/langevin.png>]
-<figures/flow_visualization.png, id=37, 889.3225pt x 649.42625pt>
+<figures/flow_visualization.png, id=36, 889.3225pt x 649.42625pt>
 File: figures/flow_visualization.png Graphic file (type png)
 <use figures/flow_visualization.png>
-Package pdftex.def Info: figures/flow_visualization.png  used on input line 34.
+Package pdftex.def Info: figures/flow_visualization.png  used on input line 38.
 (pdftex.def)             Requested size: 252.0pt x 184.01819pt.
 
-Underfull \hbox (badness 1502) in paragraph at lines 39--40
+Underfull \hbox (badness 1502) in paragraph at lines 43--44
 []\OT1/ptm/m/n/10 For tra-jec-tory mod-el-ing, con-tin-u-ous nor-mal-iz-ing flows
  []
 
 
-Underfull \hbox (badness 2582) in paragraph at lines 43--45
+Underfull \hbox (badness 2582) in paragraph at lines 47--49
 \OT1/ptm/m/n/10 The log-density evolves ac-cord-ing to the in-stan-ta-neous
  []
 
-<figures/flow_diagram.png, id=38, 1405.25pt x 401.5pt>
+<figures/flow_diagram.png, id=37, 1405.25pt x 401.5pt>
 File: figures/flow_diagram.png Graphic file (type png)
 <use figures/flow_diagram.png>
-Package pdftex.def Info: figures/flow_diagram.png  used on input line 54.
+Package pdftex.def Info: figures/flow_diagram.png  used on input line 58.
 (pdftex.def)             Requested size: 252.0pt x 71.99731pt.
 
-Underfull \hbox (badness 10000) in paragraph at lines 60--61
+Underfull \hbox (badness 10000) in paragraph at lines 64--65
 []\OT1/ptm/m/n/10 We con-di-tion on $\OT1/cmr/bx/n/10 x[]$ \OT1/ptm/m/n/10 and flow pa-ram-e-ters
  []
 
 ) (./model.tex
-<figures/architecture.png, id=39, 1409.265pt x 352.31625pt>
+<figures/architecture.png, id=38, 1409.265pt x 352.31625pt>
 File: figures/architecture.png Graphic file (type png)
 <use figures/architecture.png>
 Package pdftex.def Info: figures/architecture.png  used on input line 4.
@@ -618,69 +628,62 @@ LaTeX Warning: `!h' float specifier changed to `!ht'.
 <figures/mlp_gru.png, id=48, 1232.605pt x 538.01pt>
 File: figures/mlp_gru.png Graphic file (type png)
 <use figures/mlp_gru.png>
-Package pdftex.def Info: figures/mlp_gru.png  used on input line 24.
+Package pdftex.def Info: figures/mlp_gru.png  used on input line 25.
 (pdftex.def)             Requested size: 252.0pt x 109.98901pt.
-
-Underfull \vbox (badness 4072) has occurred while \output is active []
-
  [3 <./figures/architecture.png> <./figures/mlp_gru.png>]
-Overfull \hbox (4.1116pt too wide) detected at line 67
+Overfull \hbox (4.1116pt too wide) detected at line 68
 []
  []
 
 [4]) (./experiment.tex
-LaTeX Font Info:    Trying to load font information for OT1+pcr on input line 13.
+LaTeX Font Info:    Trying to load font information for OT1+pcr on input line 12.
  (/usr/local/texlive/2024/texmf-dist/tex/latex/psnfss/ot1pcr.fd
 File: ot1pcr.fd 2001/06/04 font definitions for OT1/pcr.
-) [5]) (./results.tex [6]
+) [5] [6]) (./results.tex
 <figures/results/inc-cylinder/ODE_inference.png, id=66, 519.9425pt x 83.31125pt>
 File: figures/results/inc-cylinder/ODE_inference.png Graphic file (type png)
 <use figures/results/inc-cylinder/ODE_inference.png>
-Package pdftex.def Info: figures/results/inc-cylinder/ODE_inference.png  used on input line 17.
-(pdftex.def)             Requested size: 252.0pt x 40.37793pt.
-<figures/results/shock-tube/timestep_mae.png, id=67, 867.24pt x 361.35pt>
-File: figures/results/shock-tube/timestep_mae.png Graphic file (type png)
-<use figures/results/shock-tube/timestep_mae.png>
-Package pdftex.def Info: figures/results/shock-tube/timestep_mae.png  used on input line 26.
-(pdftex.def)             Requested size: 252.0pt x 104.99834pt.
-
-
-LaTeX Warning: `!h' float specifier changed to `!ht'.
-
-File: figures/results/inc-cylinder/ODE_inference.png Graphic file (type png)
-<use figures/results/inc-cylinder/ODE_inference.png>
-Package pdftex.def Info: figures/results/inc-cylinder/ODE_inference.png  used on input line 34.
+Package pdftex.def Info: figures/results/inc-cylinder/ODE_inference.png  used on input line 13.
 (pdftex.def)             Requested size: 252.0pt x 40.37793pt.
 
-LaTeX Warning: `!h' float specifier changed to `!ht'.
-
-<figures/results/shock-tube/trajectory_overlay.png, id=68, 457.6005pt x 570.6045pt>
-File: figures/results/shock-tube/trajectory_overlay.png Graphic file (type png)
-<use figures/results/shock-tube/trajectory_overlay.png>
-Package pdftex.def Info: figures/results/shock-tube/trajectory_overlay.png  used on input line 41.
-(pdftex.def)             Requested size: 126.0pt x 157.11263pt.
 
 LaTeX Warning: `!h' float specifier changed to `!ht'.
 
-<figures/results/shock-tube/vsde_vs_cnf_difference.png, id=69, 722.7pt x 361.35pt>
+<figures/results/shock-tube/vsde_vs_cnf_difference.png, id=67, 722.7pt x 361.35pt>
 File: figures/results/shock-tube/vsde_vs_cnf_difference.png Graphic file (type png)
 <use figures/results/shock-tube/vsde_vs_cnf_difference.png>
-Package pdftex.def Info: figures/results/shock-tube/vsde_vs_cnf_difference.png  used on input line 48.
+Package pdftex.def Info: figures/results/shock-tube/vsde_vs_cnf_difference.png  used on input line 24.
 (pdftex.def)             Requested size: 252.0pt x 126.00021pt.
 
 LaTeX Warning: `!h' float specifier changed to `!ht'.
 
-<figures/results/integrator/comparison_mae.png, id=70, 722.7pt x 361.35pt>
-File: figures/results/integrator/comparison_mae.png Graphic file (type png)
-<use figures/results/integrator/comparison_mae.png>
-Package pdftex.def Info: figures/results/integrator/comparison_mae.png  used on input line 56.
-(pdftex.def)             Requested size: 252.0pt x 126.00021pt.
+<figures/results/shock-tube/timestep_mae.png, id=68, 1277.77374pt x 536.0025pt>
+File: figures/results/shock-tube/timestep_mae.png Graphic file (type png)
+<use figures/results/shock-tube/timestep_mae.png>
+Package pdftex.def Info: figures/results/shock-tube/timestep_mae.png  used on input line 34.
+(pdftex.def)             Requested size: 252.0pt x 105.70189pt.
+<figures/results/distribtution.png, id=69, 735.74875pt x 576.1525pt>
+File: figures/results/distribtution.png Graphic file (type png)
+<use figures/results/distribtution.png>
+Package pdftex.def Info: figures/results/distribtution.png  used on input line 41.
+(pdftex.def)             Requested size: 252.0pt x 197.33983pt.
 
 LaTeX Warning: `!h' float specifier changed to `!ht'.
 
-) (./conclusion.tex) (./main.bbl [7 <./figures/results/inc-cylinder/ODE_inference.png> <./figures/results/shock-tube/timestep_mae.png> <./figures/results/shock-tube/trajectory_overlay.png> <./figures/results/shock-tube/vsde_vs_cnf_difference.png>]) [8
+[7 <./figures/results/inc-cylinder/ODE_inference.png> <./figures/results/shock-tube/vsde_vs_cnf_difference.png> <./figures/results/shock-tube/timestep_mae.png>]
+Underfull \hbox (badness 1917) in paragraph at lines 51--52
+[]\OT1/ptm/m/n/10 The CNF{VSDE model suc-cess-fully re-pro-duces these
+ []
 
- <./figures/results/integrator/comparison_mae.png>] (./appendix/pyfr.tex) [9
+<figures/results/shock-tube/trajectory_overlay.png, id=77, 457.6005pt x 570.6045pt>
+File: figures/results/shock-tube/trajectory_overlay.png Graphic file (type png)
+<use figures/results/shock-tube/trajectory_overlay.png>
+Package pdftex.def Info: figures/results/shock-tube/trajectory_overlay.png  used on input line 56.
+(pdftex.def)             Requested size: 126.0pt x 157.11263pt.
+
+Underfull \vbox (badness 4543) has occurred while \output is active []
+
+) (./discussion.tex [8 <./figures/results/distribtution.png> <./figures/results/shock-tube/trajectory_overlay.png>]) (./conclusion.tex [9]) (./main.bbl) [10] (./appendix/pyfr.tex) [11
 
 ] (./appendix/implementation.tex
 Underfull \hbox (badness 10000) in paragraph at lines 10--11
@@ -692,7 +695,7 @@ Underfull \hbox (badness 10000) in paragraph at lines 15--16
 \OT1/ptm/m/n/10 Dataset from \OT1/pcr/m/n/10 PyFR \OT1/ptm/m/n/10 is up-loaded on Google Drive: $\OT1/pcr/m/n/10 https : / / drive . google . com / file / d /
  []
 
-) [10] (./appendix/glossary.tex
+) [12] (./appendix/glossary.tex
 
 LaTeX Warning: No positions in optional float specifier.
                Default added (so using `tbp') on input line 4.
@@ -700,7 +703,11 @@ LaTeX Warning: No positions in optional float specifier.
 
 LaTeX Warning: Float too large for page by 53.0318pt on input line 103.
 
-[11] [12]) (./appendix/gru_mlp.tex) [13] (./appendix/hyperparams.tex) [14]
+[13] [14]) (./appendix/gru_mlp.tex) [15] (./appendix/hyperparams.tex
+
+LaTeX Warning: `!h' float specifier changed to `!ht'.
+
+[16]) [17]
 
 ** Conference Paper **
 Before submitting the final camera ready copy, remember to:
@@ -717,24 +724,20 @@ Before submitting the final camera ready copy, remember to:
 LaTeX2e <2023-11-01> patch level 1
 L3 programming layer <2024-02-20>
  ***********
-
-
-LaTeX Warning: There were multiply-defined labels.
-
  ) 
 Here is how much of TeX's memory you used:
- 15360 strings out of 474116
- 310386 string characters out of 5743683
+ 15735 strings out of 474116
+ 316002 string characters out of 5743683
  1956187 words of memory out of 5000000
- 37381 multiletter control sequences out of 15000+600000
- 610937 words of font info for 146 fonts, out of 8000000 for 9000
+ 37741 multiletter control sequences out of 15000+600000
+ 611245 words of font info for 147 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 89i,14n,90p,1134b,354s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 89i,14n,90p,1290b,556s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx7.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi5.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi6.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi9.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmib10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cmextra/cmmib7.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr5.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr6.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/courier/ucrr8a.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/times/utmbi8a.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
-Output written on main.pdf (14 pages, 4046053 bytes).
+Output written on main.pdf (17 pages, 4371006 bytes).
 PDF statistics:
- 207 PDF objects out of 1000 (max. 8388607)
- 113 compressed objects within 2 object streams
+ 216 PDF objects out of 1000 (max. 8388607)
+ 119 compressed objects within 2 object streams
  0 named destinations out of 1000 (max. 500000)
  78 words of extra memory for PDF output out of 10000 (max. 10000000)
 

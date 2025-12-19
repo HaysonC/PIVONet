@@ -1,21 +1,166 @@
 \section{Hyperparameter Summary} \label{apx:hyperparams}
-Table~\ref{tab:hyperparams} collects the representative hyperparameters for each flow case we evaluate. Each row highlights the configuration used for the trajectory sampling, CNF backbone training, VSDE controller fitting, and inference diagnostics for that flow.
+
+The tables below summarize the representative hyperparameters for each flow case we evaluate, including trajectory sampling, CNF backbone training, VSDE controller fitting, and inference diagnostics.  
+
+We first provide an overview table describing the meaning of each hyperparameter.
+
 \begin{table}[h!]
     \centering
-    \caption{Representative settings for each flow in the benchmark suite.}
-    \label{tab:hyperparams}
-    \begin{tabularx}{\linewidth}{lX}
+    \caption{Hyperparameter descriptions for all flows.}
+    \begin{tabular}{ll}
         \hline
-        \textbf{Flow} & \textbf{Key settings (trajectory / CNF / VSDE / inference)} \\
+        \textbf{Component} & \textbf{Description} \\
         \hline
-        Euler vortex & 4096 particles, 240 steps, \(\Delta t=0.01\) / CNF: batch 512, 8 epochs, lr 0.002, hidden 64, depth 3, context 3, limit 1024 / VSDE: batch 2048, 50 epochs, lr 0.01, 64 particles, 120 steps, control cost 1.0, learnable diffusion / Inference: 64 particles, 120 steps, overlay outputs + phase plots. \\
-        Viscous shock tube & 1024 particles, 240 steps, \(\Delta t=0.01\) / CNF: batch 512, 8 epochs, lr 0.001, hidden 64, depth 3, context 3, limit 512 / VSDE: batch 128, 4 epochs, lr 0.005, 4 particles, 60 steps, control cost 1.0, learnable diffusion / Inference: 32 particles, 60 steps, overlay outputs + phase plots. \\
-        Axial compressor & 8192 particles, 180 steps, \(\Delta t=0.005\) / CNF: batch 1024, 10 epochs, lr 0.0015, hidden 128, depth 4, context 4, limit 2048 / VSDE: batch 1024, 30 epochs, lr 0.005, 96 particles, 150 steps, control cost 0.5, learnable diffusion / Inference: 96 particles, 150 steps, overlay outputs + flux diagnostics. \\
+        \multicolumn{2}{l}{\textbf{Trajectory}} \\
+        Particles & Number of simulated particles in the flow \\
+        Steps & Number of integration steps for trajectory sampling \\
+        \(\Delta t\) & Time step for integration \\
         \hline
-    \end{tabularx}
+        \multicolumn{2}{l}{\textbf{CNF}} \\
+        Batch size & Number of samples per training batch \\
+        Epochs & Number of training passes over the dataset \\
+        Learning rate & Step size for optimizer updates \\
+        Hidden units & Number of neurons per hidden layer \\
+        Depth & Number of hidden layers \\
+        Context dim & Dimensionality of context vector for conditioning \\
+        Limit & Maximum number of training samples per epoch \\
+        \hline
+        \multicolumn{2}{l}{\textbf{VSDE}} \\
+        Batch size & Number of samples per training batch \\
+        Epochs & Number of training passes over the dataset \\
+        Learning rate & Step size for optimizer updates \\
+        Particles & Number of controlled particles for VSDE fitting \\
+        Steps & Number of integration steps for VSDE dynamics \\
+        Control cost & Weight for control penalty in the loss \\
+        Learnable diffusion & Whether diffusion coefficient is learned \\
+        \hline
+        \multicolumn{2}{l}{\textbf{Inference}} \\
+        Particles & Number of ensemble particles for inference \\
+        Steps & Number of integration steps during inference \\
+        Diagnostics & Types of outputs generated for evaluation \\
+        \hline
+    \end{tabular}
 \end{table}
 
-The hyperparameters were selected based on preliminary tuning to balance training stability and inference accuracy across the different flow regimes. The CNF and VSDE settings reflect the complexity of the underlying dynamics, with more challenging flows requiring larger batch sizes, longer training epochs, and finer integration steps to capture the relevant features. The inference configurations ensure sufficient ensemble diversity to evaluate model performance effectively.
+\subsection{Euler Vortex}
+\begin{table}[h!]
+    \centering
+    \caption{Hyperparameters for the Euler Vortex flow.}
+    \label{tab:hyperparams_euler}
+    \begin{tabular}{ll}
+        \hline
+        \textbf{Component} & \textbf{Value} \\
+        \hline
+        \multicolumn{2}{l}{\textbf{Trajectory}} \\
+        Particles & 4096 \\
+        Steps & 240 \\
+        \(\Delta t\) & 0.01 \\
+        \hline
+        \multicolumn{2}{l}{\textbf{CNF}} \\
+        Batch size & 512 \\
+        Epochs & 8 \\
+        Learning rate & 0.002 \\
+        Hidden units & 64 \\
+        Depth & 3 \\
+        Context dim & 3 \\
+        Limit & 1024 \\
+        \hline
+        \multicolumn{2}{l}{\textbf{VSDE}} \\
+        Batch size & 2048 \\
+        Epochs & 50 \\
+        Learning rate & 0.01 \\
+        Particles & 64 \\
+        Steps & 120 \\
+        Control cost & 1.0 \\
+        Learnable diffusion & Yes \\
+        \hline
+        \multicolumn{2}{l}{\textbf{Inference}} \\
+        Particles & 64 \\
+        Steps & 120 \\
+        Diagnostics & Overlay outputs + phase plots \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsection{Viscous Shock Tube}
+\begin{table}[h!]
+    \centering
+    \caption{Hyperparameters for the Viscous Shock Tube flow.}
+    \label{tab:hyperparams_vis}
+    \begin{tabular}{ll}
+        \hline
+        \textbf{Component} & \textbf{Value} \\
+        \hline
+        \multicolumn{2}{l}{\textbf{Trajectory}} \\
+        Particles & 1024 \\
+        Steps & 240 \\
+        \(\Delta t\) & 0.01 \\
+        \hline
+        \multicolumn{2}{l}{\textbf{CNF}} \\
+        Batch size & 512 \\
+        Epochs & 8 \\
+        Learning rate & 0.001 \\
+        Hidden units & 64 \\
+        Depth & 3 \\
+        Context dim & 3 \\
+        Limit & 512 \\
+        \hline
+        \multicolumn{2}{l}{\textbf{VSDE}} \\
+        Batch size & 128 \\
+        Epochs & 4 \\
+        Learning rate & 0.005 \\
+        Particles & 4 \\
+        Steps & 60 \\
+        Control cost & 1.0 \\
+        Learnable diffusion & Yes \\
+        \hline
+        \multicolumn{2}{l}{\textbf{Inference}} \\
+        Particles & 32 \\
+        Steps & 60 \\
+        Diagnostics & Overlay outputs + phase plots \\
+        \hline
+    \end{tabular}
+\end{table}
+\newpage
+\subsection{Incompressible Cylinder}
+\begin{table}[h]
+    \centering
+    \caption{Hyperparameters for the Incompressible Cylinder flow.}
+    \label{tab:hyperparams_inc}
+    \begin{tabular}{ll}
+        \hline
+        \textbf{Component} & \textbf{Value} \\
+        \hline
+        \multicolumn{2}{l}{\textbf{Trajectory}} \\
+        Particles & 1024 \\
+        Steps & 240 \\
+        \(\Delta t\) & 0.01 \\
+        \hline
+        \multicolumn{2}{l}{\textbf{CNF}} \\
+        Batch size & 512 \\
+        Epochs & 8 \\
+        Learning rate & 0.001 \\
+        Hidden units & 64 \\
+        Depth & 3 \\
+        Context dim & 3 \\
+        Limit & 512 \\
+        \hline
+        \multicolumn{2}{l}{\textbf{VSDE}} \\
+        Batch size & 128 \\
+        Epochs & 4 \\
+        Learning rate & 0.005 \\
+        Particles & 4 \\
+        Steps & 60 \\
+        Control cost & 1.0 \\
+        Learnable diffusion & Yes \\
+        \hline
+        \multicolumn{2}{l}{\textbf{Inference}} \\
+        Particles & 32 \\
+        Steps & 60 \\
+        Diagnostics & Overlay outputs + phase plots \\
+        \hline
+    \end{tabular}
+\end{table}
 
 
-You set and view specific hyperparameters in the code repository accompanying this manuscript, which includes configuration files and scripts to reproduce the experimental results reported herein. Those files are located in \texttt{src/experiments/}. Inside the files with \texttt{.yaml} extensions, you can find the hyperparameter values used for each flow case and experiment step.
+The hyperparameters were selected to balance training stability and inference accuracy across different flow regimes. CNF and VSDE settings scale with flow complexity, while inference configurations ensure sufficient ensemble diversity for performance evaluation. All values are also available in the repository under \texttt{src/experiments/} in the \texttt{.yaml} configuration files.

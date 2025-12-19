@@ -77,8 +77,9 @@ pivo
 In the conversational CLI:
 
 1. Choose `import` → **Model checkpoints (pretrained)** and select the downloaded folder. It would be under pretrained in the drive.
-2. Choose `experiment` and select the dataset you imported checkpoints for (e.g. `2d-euler-vortex`).
-3. When a training step detects an existing checkpoint, choose **Skip step (reuse cached checkpoint)**.
+2. Choose  `import` → **Trajectory** and import the ground truth data for evaluation. It would be under data in the drive.
+3. Choose `experiment` and select the dataset you imported checkpoints for (e.g. `2d-euler-vortex`).
+4. When a training step detects an existing checkpoint, choose **Skip step (reuse cached checkpoint)**.
    - This runs inference using the imported pretrained models.
 
 > [!TIP]

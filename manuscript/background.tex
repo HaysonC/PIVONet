@@ -5,13 +5,17 @@ We model particle trajectories using the overdamped Langevin equation, which cap
     d\mathbf{x}_t = \mathbf{u}(\mathbf{x}_t) \, dt + \sqrt{2D} \, d\mathbf{W}_t
     \label{eq:langevin}
 \end{equation}
-This is a SDE where $\mathbf{u}(\mathbf{x}_t)$\footnote{The simulation to obtain $u$ will be discucsed in Section \ref{sec:xsimulation}} is the local fluid velocity field (Fig.~\ref{fig:cfd_langevin}a), $D$ is the diffusion coefficient, and $\mathbf{W}_t$ is a two-dimensional Brownian motion, neglecting inertial effects. 
+This is a SDE where $\mathbf{u}(\mathbf{x}_t)$\footnote{The simulation to obtain $u$ will be discussed in Section \ref{sec:xsimulation}} is the local fluid velocity field (Fig.~\ref{fig:cfd_langevin}a), $D$ is the diffusion coefficient, and $\mathbf{W}_t$ is a two-dimensional Brownian motion, neglecting inertial effects. 
 
 \begin{figure}[h!]
     \centering
     \includegraphics[width=1\linewidth]{figures/langevin.png}
     \caption{\textbf{Langevin Dynamics: Particle Motion in Fluid Flow.} The Langevin equation
-    $dx_t = u(x_t)dt + \sqrt{2D}dW_t$ governs particle motion in fluid flows. (a) Poiseuille velocity profile $u(x,y)$ with parabolic shape. (b) Single particle trajectory showing deterministic advection (blue dashed) with superimposed stochastic Brownian fluctuations (red solid). (c) Multiple stochastic realizations from the same initial condition $x_0$, illustrating the spread of particle positions due to randomness.}
+    $dx_t = u(x_t)dt + \sqrt{2D}dW_t$ governs particle motion in fluid flows.
+(a) Poiseuille velocity profile.
+(b) Single particle trajectory.
+(c) Multiple stochastic realizations from the same initial condition.
+}
     \label{fig:cfd_langevin}
 \end{figure}
  
@@ -46,9 +50,9 @@ The log-density evolves according to the instantaneous change-of-variables formu
     \frac{d \log p(\mathbf{z}(t))}{dt} = -\text{tr}\left(\frac{\partial g_{\boldsymbol{\theta}}}{\partial \mathbf{z}}\right)
     \label{eq:cnf_logprob_ode}
 \end{equation}
-This equation tracks how probability mass compresses or expands as particles flow through the learned transformation. The trace of the Jacobian measures the divergence of the velocity field $g_{\boldsymbol{\phi}}$: positive divergence (expansion) decreases density, while negative divergence (compression) increases it. For our particle trajectories, this enables the model to learn where paths concentrate (high-probability regions like flow streamlines) versus where they disperse (low-probability regions affected by strong diffusion)~\cite{Grathwohl2019}.
+This equation tracks how probability mass compresses or expands as particles flow through the learned transformation. The trace of the Jacobian corresponds to the divergence of the velocity field and governs local density expansion or contraction. For our particle trajectories, this enables the model to learn where paths concentrate (high-probability regions like flow streamlines) versus where they disperse (low-probability regions affected by strong diffusion)~\cite{Grathwohl2019}.
 \subsection{Bi-directionality and Training}
-We model the mappings between the two distributions as a diffeomorphism. Hence, a key advantage of CNF is bi-directionality: we can integrate the ODE system both forward (from simple $\mathbf{z}_0 \sim \mathcal{N}(0, \mathbf{I})$ to complex trajectory distribution) and backward (from observed trajectory to its latent representation). The forward process generates new trajectories by sampling, while the backward process computes exact likelihoods for training~\cite{Rezende2015}. Figure~\ref{fig:cnf_transformation} illustrates this bidirectional transformation, showing how the initially Gaussian distribution evolves through intermediate time steps into the complex, multimodal distribution of particle trajectories conditioned on flow parameters. The ODE system in Eqs.~\eqref{eq:cnf_ode}--\eqref{eq:cnf_logprob_ode} is solved jointly using adaptive solvers, allowing us to compute exact likelihoods for any trajectory under the learned distribution—essential for training and uncertainty quantification~\cite{Kingma2018}.
+Since we model the mappings between the two distributions as a diffeomorphism, we have an advantage of CNF being bi-directionality: we can integrate the ODE system both forward (from simple $\mathbf{z}_0 \sim \mathcal{N}(0, \mathbf{I})$ to complex trajectory distribution) and backward (from observed trajectory to its latent representation). The forward process generates new trajectories by sampling, while the backward process computes exact likelihoods for training~\cite{Rezende2015}. Figure~\ref{fig:cnf_transformation} illustrates this bidirectional transformation, showing how the initially Gaussian distribution evolves through intermediate time steps into the complex, multimodal distribution of particle trajectories conditioned on flow parameters. The ODE system in Eqs.~\eqref{eq:cnf_ode}--\eqref{eq:cnf_logprob_ode} is solved jointly using adaptive solvers, allowing us to compute exact likelihoods for any trajectory under the learned distribution—essential for training and uncertainty quantification~\cite{Kingma2018}.
 \begin{figure}[h!]
     \centering
     \includegraphics[width=1\linewidth]{figures/flow_diagram.png}

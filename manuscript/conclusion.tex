@@ -1,8 +1,8 @@
 \section{Conclusion}
-\subsection{Further Disccussion}
 
 \subsection{Summary of Contributions}
-The project aims to model physical representations with efficient generative models, making it suitable and effective for applications in fluid modeling.
+The project aims to model physical representations with efficient generative models, making it suitable and effective for applications in fluid modeling. We examined the structural limitations of continuous normalizing flows when used to model complex, gradient varying dynamics and demonstrated how a variational stochastic differential equation formulation can address these limitations. By interpreting CNF and VSDE through their governing differential equations, we showed that deterministic, homogeneous flow models are inherently prone to systematic error accumulation, while trajectory-conditioned stochastic corrections enable localized adaptation without sacrificing global coherence. Empirical results across multiple integration schemes and spatial regimes support this interpretation, with the VSDE consistently reducing error relative to the CNF. The stochastic component introduces a bias–variance tradeoff inherent to SDE dynamics. The impacts of model structure in learned dynamical systems are identified as critical aspects in the behaviour and quality of results and motivate further exploration of stochastic and controlled extensions to deterministic flow-based models.
 
 
-\subsection{Future Works}
+\subsection{Future Work}
+While the VSDE effectively corrects trajectory-level deviations by additively augmenting a frozen deterministic drift, this formulation inherently limits expressiveness in regimes where the backbone dynamics themselves are structurally misrepresented. In such cases, additive control may be insufficient to capture state-dependent changes in the underlying flow geometry and our future exploration could build upon the multiplicative or state-dependent control mechanisms that more fundamentally reshape the governing dynamics. The use of a time-decaying diffusion schedule was not informed with a realistic theoretically optimal policy. Further work could investigate adaptive or learned diffusion schedules that dynamically balance stochastic exploration and precision across time, potentially improving accuracy while retaining stability.

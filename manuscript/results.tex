@@ -1,12 +1,8 @@
 \section{Results}
 
-This section presents experimental results corresponding to the hypotheses outlined. 
-As well, MAE is chosen as the primary metric for evaluating model performance across various scenarios. This is becasue:
-\begin{enumerate}
-\item \textbf{Interpretability}: MAE provides a straightforward measure of average error in the same units as the predicted variable, making it easy to interpret the model's performance in practical terms.
-\item \textbf{Linearity}: MAE treats all errors equally, providing a linear measure of average error without disproportionately penalizing larger errors, which is suitable for many fluid dynamics applications where consistent performance is desired.
-\item \textbf{Robustness to Outliers}: While MAE is sensitive to outliers, it is less so than metrics like Mean Squared Error (MSE). This balance makes MAE a good choice for fluid dynamics data, which may contain occasional anomalies due to turbulence or measurement noise.
-\end{enumerate}
+This section presents experimental results corresponding to the hypotheses outlined in Section IV-A. We evaluate the proposed CNF–VSDE framework in terms of model expressiveness, the contribution of variational stochastic control, generalization across distinct flow regimes, and numerical stability under different ODE integration schemes.
+
+Model performance is primarily quantified using mean absolute error (MAE) across all evaluated scenarios. MAE is selected due to its interpretability, as it measures average prediction error in the same physical units as the target variables, facilitating direct comparison with ground-truth fluid trajectories. In addition, MAE provides a linear error measure that does not disproportionately penalize large deviations, which is desirable in fluid dynamics applications where consistent accuracy is preferred over sensitivity to rare extreme events. Compared to squared-error metrics, MAE also offers increased robustness to occasional anomalies arising from turbulence or numerical noise.
 \subsection{Expressiveness of ODE Backbones for Fluid Dynamics}
 We first evaluate the performance of different ODE-based backbone models in capturing fluidic dynamics. Overall, the ODE-only approach is able to learn the dominant, mean flow behavior and produces smooth, physically consistent trajectories that align with the large-scale structure of the flow. In particular, the homogeneous CNF successfully converges to a stable solution that reflects the primary deterministic dynamics of the incompressible cylinder flow.
 
@@ -19,41 +15,52 @@ However, this same determinism becomes a limitation when modeling stochastic flu
 \label{fig:inc-cylinder-ode}
 \end{figure}
 
-\subsection{Comparison of CNF with and without VSDE forcing}
-By incorporating a learned stochastic inhomogeneous forcing term through the the entire PIVONet framework, we observe a significant enhancement in the model's ability to capture the inherent variability and randomness of fluid dynamics. The VSDE component introduces latent variables that enable the model to represent a richer distribution over possible flow trajectories, allowing it to account for fine-scale fluctuations and multi-modal behaviors that were previously unrepresented in the ODE-only approach. This results in a more faithful reproduction of the stochastic characteristics observed in the ground truth data, as the
-\begin{figure}[h!]
-    \centering
-    \includegraphics[width=1\linewidth]{figures/results/shock-tube/timestep_mae.png}
-    \caption{Caption}
-    \label{fig:placeholder}
-\end{figure}
+\subsection{Impact of Variational Stochastic Control on Trajectory Fidelity}
 
-
-\begin{figure}[h!]
-    \centering
-    \includegraphics[width=1\linewidth]{figures/results/inc-cylinder/ODE_inference.png}
-    \caption{Caption}
-    \label{fig:placeholder}
-\end{figure}
-
-\begin{figure}[h!]
-    \centering
-    \includegraphics[width=0.5\linewidth]{figures/results/shock-tube/trajectory_overlay.png}
-    \caption{Caption}
-    \label{fig:placeholder}
-\end{figure}
+To improve alignment with physical variability, we evaluate the effect of incorporating variational stochastic differential equation (VSDE) control into the CNF backbone. This analysis directly addresses whether stochastic augmentation enhances trajectory fidelity and uncertainty representation.
 
 \begin{figure}[h!]
     \centering
     \includegraphics[width=1\linewidth]{figures/results/shock-tube/vsde_vs_cnf_difference.png}
-    \caption{Like different regimes}
-    \label{fig:placeholder}
+    \caption{Regional comparison of mean absolute error (MAE) between the CNF-only and CNF–VSDE models, showing consistently lower error for VSDE across all spatial regions.}
+    \label{fig:regional_error}
 \end{figure}
+
+Fig.~\ref{fig:regional_error} presents a spatial comparison of MAE between the CNF-only and CNF–VSDE models. Across all spatial regions, the VSDE-enhanced model consistently achieves lower reconstruction error. These improvements indicate that the learned posterior control actively compensates for deviations introduced by the frozen CNF drift, particularly in regions where stochastic effects play a significant role.
 
 
 \begin{figure}[h!]
     \centering
-    \includegraphics[width=1\linewidth]{figures/results/integrator/comparison_mae.png}
-    \caption{Like integrator}
+    \includegraphics[width=1\linewidth]{figures/results/shock-tube/timestep_mae.png}
+    \caption{Comparison of ensemble trajectory behavior between the CNF-only and VSDE models. The CNF-only model produces relatively deterministic trajectories, whereas the VSDE framework generates ensembles exhibiting realistic dispersion. Although the VSDE model initially struggled to capture the accurate representation of turbulent and shear-dominated regions, the trajectories match the stochastic behavior observed in the CFD ground truth.}
+    \label{fig:timestep_mae}
+\end{figure}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=1\linewidth]{figures/results/distribtution.png}
+    \caption{Distribution of final-position MAE for the viscous shock tube. VSDE control shifts the error distribution toward lower values relative to the CNF-only model, indicating improved trajectory fidelity without sacrificing ensemble diversity.}
+    \label{fig:mae_error}
+\end{figure}
+
+
+\subsection{Physical Consistency in Velocity-Space Dynamics}
+
+Physical consistency is further evaluated by comparing velocity phase-space structure and speed distributions against CFD reference statistics. As shown in Fig.~10, the ground-truth velocity field exhibits pronounced anisotropy in $(v_x, v_y)$ space and a broad, non-Gaussian speed distribution characteristic of shear- and turbulence-driven flow at early times. 
+
+The CNF–VSDE model successfully reproduces these velocity-space patterns and preserves the empirical spread of particle speeds. In contrast, the CNF-only model collapses trajectories into a narrower region of velocity space, indicating an underrepresentation of physical variability. These results suggest that variational stochastic control enables the model to capture physically meaningful velocity distributions rather than merely approximating mean transport behavior.
+
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.5\linewidth]{figures/results/shock-tube/trajectory_overlay.png}
+    \caption{Qualitative comparison of trajectory reconstructions for the viscous shock tube.
+Ground-truth particle trajectories (gray) are overlaid with predictions from the CNF–VSDE model (purple) and the CNF-only model (yellow). The VSDE trajectories more closely follow the geometry and dispersion of the ground truth, particularly in regions of strong curvature and shear, while the CNF-only model exhibits accumulated drift and reduced variability.}
     \label{fig:placeholder}
 \end{figure}
+
+\subsection{Generalization Across Flow Regimes}
+Generalization is evaluated using the viscous shock tube scenario, which is characterized by sharp gradients and significant dissipative effects. As shown in Fig.~10, the CNF–VSDE model maintains close agreement with ground-truth trajectories, while the CNF-only baseline exhibits larger deviations. The corresponding MAE distribution in Fig.~12 demonstrates a consistent shift toward lower error for the VSDE model across the trajectory ensemble.
+
+These results indicate that the proposed framework generalizes effectively to shock-dominated viscous flows without requiring architectural modification, thereby supporting the hypothesis.
+

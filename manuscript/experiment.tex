@@ -1,11 +1,10 @@
-\section{Experiment Setup}
+\section{Experiment Methodology}
 \subsection{Hypothesis}
 The experiment is designed to test the hypothesis that:
 \begin{enumerate}
     \item Using neuro ODE-based generative models can effectively capture complex fluid dynamics.
     \item Integrating VSDE controllers with CNF backbones enhances the model's ability to represent stochastic behaviors in fluid flows.
     \item The proposed framework can generalize across different flow regimes, including inviscid, viscous, and incompressible scenarios.
-    \item The proposed framewrok is numerically stable and can generalize with differnt integrators.
 \end{enumerate}
 
 \subsection{Data Simulation}\label{sec:xsimulation}
@@ -46,7 +45,7 @@ We evaluate our framework across three canonical fluid dynamics scenarios that e
     \item \textbf{Incompressible Cylinder Flow:} This case examines the flow around a circular cylinder in an incompressible fluid. The cylinder flow problem assesses the model's capability to capture boundary layer development, vortex shedding, and wake dynamics.
 \end{itemize}
 
-The specific configurations for each flow case, including domain size, mesh resolution, initial and boundary conditions, and physical parameters (e.g., Reynolds number, Mach number), are detailed in the code repository accompanying this manuscript. In addtional below is a brief overview of the governing equations and numerical setups for each scenario.
+The specific configurations for each flow case, including domain size, mesh resolution, initial and boundary conditions, and physical parameters (e.g., Reynolds number, Mach number), are detailed in the code repository accompanying this manuscript. In addtional, below is a brief overview of the governing equations and numerical setups for each scenario.
 
 \paragraph{2D Euler Vortex}
 The 2D Euler vortex is governed by the inviscid Euler equations, which describe the conservation of mass, momentum, and energy in a compressible fluid without viscosity. The governing equations are expressed in conservation form as:
@@ -74,21 +73,19 @@ where \(\mathbf{u}\) is the velocity field, \(p\) is the pressure field, and \(\
 
 
 \subsection{Experiment Workflow}
-The empirical pipeline described below is executed across several flow cases (2D Euler vortex, viscous shock tube, and incompressible cylinder)  whose configurations are captured in the code base. Appendix \ref{apx:implementation} details the software implementation, which includes clearly defined wroflow modules that matches the steps below:
+The empirical pipeline described below is executed across several flow cases (2D Euler vortex, viscous shock tube, and incompressible cylinder)  whose configurations are captured in the code base. Appendix \ref{apx:implementation} details the software implementation, which includes clearly defined workflow modules that matches the steps below. Training hyperparameters are provided in \ref{apx:hyperparams}
 
 \begin{enumerate}
-	\item \textbf{Trajectory simulation:} 4096 particles are marched for 240 steps with varying \(\Delta t\) to produce bundles of trajectories, velocity snapshots, and mesh coordinates that subsequent modules reuse.
-	\item \textbf{CNF backbone training:} The CNF drift network trains on the trajectory endpoints in minibatches of 512 for eight epochs, using a 0.002 learning rate, hidden dimension 64, depth 3, and context dimension 3;
-	\item \textbf{VSDE controller training:} With the CNF frozen, the variational posterior drift net and diffusion scale optimize over 50 epochs with batch size 2048, learning rate 0.01, 64 particles, and 120 integration steps; control cost, kinetic-energy, and PDE penalties regularize the latent paths while the diffusion remains learnable.
-	\item \textbf{Inference diagnostics:} Ensembles of 64 particles over 120 steps are decoded through the CNF+VSDE pair to produce overlay PNGs (VSDE vs. GT, CNF vs. GT, mixed overlays) and velocity-phase plots. We save the experimental artifacts.
-	\item \textbf{Velocity visualization:} A 50k-vector sample renders the velocity phase-space PNG, and a quiver animation (vector stride 3, 12 fps) animates temporal evolution for QA.
+	\item \textbf{Trajectory simulation:} Particles are marched for 240 steps with varying \(\Delta t\) to produce bundles of trajectories, velocity snapshots, and mesh coordinates that subsequent modules reuse.
+	\item \textbf{CNF backbone training:} The CNF drift network trains on the trajectory endpoints.
+	\item \textbf{VSDE controller training:} With the CNF frozen, the variational posterior drift net optimizes the trajectories.
+	\item \textbf{Inference diagnostics:} Ensembles of 64 particles over 120 steps are decoded and plotted alongside evaluation metrics.
 \end{enumerate}
 
 \subsection{Training and Experimental Metrics}\label{sec:training_metrics}
-Training runs used Apple M1 silicon (MPS backend) so the CNF and VSDE modules finish within roughly 15 minutes each on the cached trajectory bundles; we warm up the learning rate for 1k steps and rely on AdamW with cosine annealing to stabilize convergence. The CFD trajectories are split into training and validation bundles that emphasize the vortex phase so the learned dynamics focus on the advection-dominated regime.
+Data was simulated in bundles on the Google Cloud platfrom via an 80 GB NVIDIA H100 GPU cluster provided by Google Colab. Training runs used Apple M-Series silicon (MPS backend) so the CNF and VSDE modules finish within roughly 15 minutes each on the cached trajectory bundles; we warm up the learning rate for 1k steps and rely on AdamW with cosine annealing to stabilize convergence. The CFD trajectories are split into training and validation bundles that emphasize the vortex phase so the learned dynamics focus on the advection-dominated regime.
 
-Hyperparameter values are summarized in Table~\ref{tab:hyperparams} (Appendix~\ref{apx:hyperparams}): the CNF uses minibatches of 512 for eight epochs with a 0.002 base learning rate, while the VSDE controller executes 50 epochs with batch size 2048, learning rate 0.01, 64 posterior particles, 120 integration steps, and physics penalties on control cost, kinetic energy, and the PDE residual.
-
+Hyperparameter values are summarized in Table~\ref{tab:hyperparams_euler}, \ref{tab:hyperparams_vis}, and \ref{tab:hyperparams_inc}  (Appendix~\ref{apx:hyperparams}). 
 \subsection{Evaluation Sets}
 \subsubsection{VSDE vs. CNF-only Dynamics}
 We measure reconstruction accuracy on held-out bundles for each flow case and report the VSDE-augmented latent paths alongside the baseline CNF-only ODE. Across the Euler vortex, viscous shock tube, and incompressible cylinder experiments, the VSDE consistently improves RMSE and likelihood by steering trajectories back toward the learned manifold whenever the CNF starts to deviate.

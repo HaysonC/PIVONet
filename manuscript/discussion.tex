@@ -1,0 +1,48 @@
+\section{Discussion}
+\subsection{Structural Roles of CNF and VSDE}
+Our proposed framework decomposes the learning dynamic into two complementary components, with a deterministic, homogeneous backbone ODE implemented by the continuous normalizing flow (CNF), and a stochastic, inhomogeneous correction process implemented by the variational stochastic differential equation (VSDE). Our CNF implementation defines a single global, time-conditioned velocity field as
+\[\frac{dz}{dt} = f_\theta (z,t,\alpha)\]
+
+where the drift field, $f_{\theta}$ is globally parameterized and shared across all trajectories conditioned on the same flow parameters. The CNF implementation uses such a deterministic ODE to define a single, globally smooth flow map for a fixed conditioning context. Once the parameters and context are fixed, this ODE admits a unique solution for each initial condition, and all trajectories evolve under the same time-dependent vector field. As a result, the CNF is structurally biased toward capturing the mean advective behavior of the flow rather than trajectory-specific deviations.
+
+This formulation is well-suited for learning globally consistent transport dynamics, but it inherently limits expressiveness in regimes where the true dynamics exhibit strong local variability. Because the governing equation is deterministic and homogeneous across trajectories, local mismatch between the learned vector field and the true dynamics accumulates monotonically along the flow. The diffeomorphic and stable nature of the CNF dynamics, while essential for accurate global transport, constrains the model’s ability to represent sharp transitions, localized mixing, or trajectory-dependent corrections. Introducing such effects would require redefining the global vector field, which would compromise the smoothness and consistency of the learned flow map. Consequently, the CNF lacks a mechanism to adapt locally without sacrificing its global structural properties.
+
+The VSDE is explicitly designed to address this limitation by augmenting the CNF dynamics with trajectory-dependent and stochastic corrections. At each integration step, the frozen CNF drift $f_\theta(z,t)$ is evaluated and combined with a learned posterior control $u_\phi(z,t,\mathrm{ctx})$ to form the total drift. Brownian diffusion with a time-dependent scalar coefficient $g(t)$ is then injected during the update:
+\[
+dz = \bigl[f_\theta(z,t) + u_\phi(z,t,\mathrm{ctx})\bigr]\,dt + \sqrt{2\,g(t)}\,dW_t.
+\]
+The control term $u_\phi$ breaks the homogeneity of the CNF dynamics by introducing trajectory-dependent forcing. For a fixed $(z,t)$, different posterior contexts yield different effective drifts. The diffusion term $g(t)$ introduces controlled variance into the dynamics, to perform stochastic exploration around the deterministic flow and mitigate error accumulation caused by incorrect drift alignment. These terms transform the governing equation from a single deterministic flow map into a family of stochastic trajectories conditioned on posterior information. Because the backbone drift $f_\theta$ is held fixed, the VSDE preserves the global flow structure learned by the CNF while locally perturbing the dynamics to correct trajectory-specific deviations.
+
+These structural differences manifest clearly in the empirical results. Across all numerical integrators, the CNF consistently exhibits higher final-position mean absolute error (MAE) than the VSDE. The persistence of this gap across Euler, improved Euler, RK4, and DOPRI5 indicates that the dominant source of error is not numerical discretization, but the structure of the governing dynamics themselves. In particular, the deterministic and homogeneous nature of the CNF ODE leads to systematic error accumulation that cannot be mitigated by increased integration accuracy alone. While earlier figures illustrate consistent qualitative improvements, Table~\ref{tab:mae_summary} provides a quantitative summary of error reduction across representative flow regimes. In all cases, the VSDE achieves substantial reductions in final-position MAE relative to the CNF, with improvements exceeding 80\% across regimes and approaching 96\% in the shock-dominated Euler setting. Notably, these gains persist across both smooth and highly non-uniform flows, confirming that the observed improvements are not solver-dependent but arise from structural differences in the governing dynamics.
+
+Spatially resolved error analysis further supports our discussion on this limitation. As shown in Fig.~\ref{fig:regional_error}, the CNF accumulates larger errors across all subregions, with the most pronounced discrepancies occurring in regions associated with sharp gradients and shock-driven dynamics. These regimes require localized, trajectory-specific adjustments that cannot be represented by a single global flow map. The VSDE significantly reduces error in these regions, which validates the posterior-conditioned control $u_\phi$ effectively compensates for localized dynamics that cannot be represented by a single homogeneous drift field.
+
+
+\begin{table}[h!]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\caption{MAE comparison between CNF and VSDE.}
+\label{tab:mae_summary}
+\begin{tabular}{lccc}
+\hline
+\textbf{Flow Regime} & \textbf{CNF MAE} & \textbf{VSDE MAE} & \textbf{Red. (\%)} \\
+\hline
+Viscous Shock        & 0.0711 & 0.0119 & 83.2 \\
+Euler Vortex         & 1.5828 & 0.0659 & 95.8 \\
+Incompressible Cyl.  & 1.7010 & 0.2646 & 84.4 \\
+\hline
+\end{tabular}
+\end{table}
+
+
+
+This behavior is also evident in the distributional analysis of final-position error. The CNF-only model exhibits a broad, heavy-tailed MAE distribution, indicating systematic drift and accumulated error along trajectories. When overlaid with the VSDE results, the VSDE distribution is noticeably more concentrated near zero error, reflecting improved trajectory alignment. The difference distribution (Fig.~\ref{fig:mae_error}) is strongly centered on positive values, indicating that the CNF incurs higher final-position error for the majority of trajectories. The pronounced peak near a small positive offset reflects a systematic improvement introduced by the VSDE rather than sporadic or outlier-driven gains. The relatively light tails further indicate that the VSDE does not introduce significant new failure modes or instability relative to the CNF.
+
+
+
+\subsection{Error Characteristics and Sources}
+
+The dominant error patterns observed in the results stem from inherent limitations of the governing differential equations rather than numerical discretization. In the CNF formulation, small local discrepancies between the learned drift and the true dynamics propagate coherently along deterministic trajectories, leading to systematic error growth. These effects are most pronounced in regions with shocks, diffusion-dominated behavior, and sharp spatial gradients, where the true dynamics exhibit localized variability that cannot be captured by a globally smooth flow map. The persistence of this error across numerical integration schemes—including higher-order solvers—further confirms that the discrepancies arise from structural bias in the ODE formulation rather than from insufficient numerical accuracy.
+
+The VSDE reduces these errors by augmenting the deterministic backbone with an additive stochastic correction, but residual error remains due to intrinsic limits of this formulation. Because the posterior control enters additively, the VSDE can only locally perturb the deterministic flow rather than redefine it. As a result, large structural mismatches in the frozen backbone drift cannot be fully eliminated, giving rise to an irreducible error floor. The stochastic component introduces a bias–variance tradeoff inherent to SDE dynamics. While diffusion enables flexibility and prevents trajectories from remaining trapped along incorrect deterministic paths, it also introduces variance that limits achievable precision. Although the time-decaying diffusion schedule suppresses endpoint noise, early-time stochastic perturbations can propagate forward through the dynamics.
