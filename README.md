@@ -72,7 +72,7 @@ pivo
 
 > [!NOTE]
 > Pretrained checkpoints and example data are available here:
-> https://drive.google.com/drive/folders/13ykGleAmZTNAz1lhR0x6FekYqyGYbper?usp=sharing
+> [https://drive.google.com/drive/folders/13ykGleAmZTNAz1lhR0x6FekYqyGYbper?usp=sharing](https://drive.google.com/drive/folders/13ykGleAmZTNAz1lhR0x6FekYqyGYbper?usp=sharing)
 
 In the conversational CLI:
 
