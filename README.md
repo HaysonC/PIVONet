@@ -50,14 +50,49 @@ Classical CFD solvers are computationally expensive (hours to days for complex g
 
 ### Installation
 
-Requires **Python ≥ 3.10**. Clone the repository and install:
+Here’s a clean, precise version with the **Python version explicitly pinned** and **Windows commands added**.
+
+---
+
+Requires **Python ≥ 3.10** (tested with Python 3.10–3.12).
+
+Clone the repository and install:
 
 ```bash
-git clone https://github.com/HaysonC/ODE_CNF_thermal_motion
-cd ODE_CNF_thermal_motion
+git clone https://github.com/HaysonC/PIVONet
+cd PIVONet
+```
+
+Create and activate a virtual environment:
+
+**Linux / macOS**
+
+```bash
+python3.10 -m venv venv
+source venv/bin/activate
+```
+
+**Windows (PowerShell)**
+
+```powershell
+py -3.10 -m venv venv
+venv\Scripts\Activate.ps1
+```
+
+> If PowerShell blocks activation, run once:
+>
+> ```powershell
+> Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+> ```
+
+Install dependencies and the package:
+
+```bash
+pip install --upgrade pip
 pip install -r requirements.txt
 pip install -e .
 ```
+
 
 ### Your First Simulation (2 minutes)
 
