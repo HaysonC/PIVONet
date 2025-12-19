@@ -93,7 +93,6 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-
 ### Your First Simulation (2 minutes)
 
 ```bash
@@ -112,6 +111,8 @@ pivo
 In the conversational CLI:
 
 1. Choose `import` → **Model checkpoints (pretrained)** and select the downloaded folder. It would be under pretrained in the drive.
+> [!Warning]
+> The name of the cnf checkpoint is cnf_latest.pt, the name for the vsde checkpoint is vsde_latest.pt, download the files as is, do not change their name as it might break the code
 2. Choose  `import` → **Trajectory** and import the ground truth data for evaluation. It would be under data in the drive.
 3. Choose `experiment` and select the dataset you imported checkpoints for (e.g. `2d-euler-vortex`).
 4. When a training step detects an existing checkpoint, choose **Skip step (reuse cached checkpoint)**.
