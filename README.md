@@ -92,40 +92,40 @@ Expected output:
 
 ### Quick Tips
 
-> **⚠️ Notice:** Default `limit` values in the experiment YAML files under `src/experiments/` have been reduced to lower particle/sample counts for faster, lightweight testing. Use the `--limit` or `--particles` CLI flags, or edit the YAML directly, to restore larger-scale runs when needed.
+> [!TIP]
+>
+> Default `limit` values in the experiment YAML files under `src/experiments/` have been reduced to lower particle/sample counts for faster, lightweight testing. Use the `--limit` or `--particles` CLI flags, or edit the YAML directly, to restore larger-scale runs when needed.
 
 - **Reduce particle count for fast runs ( quick testing):**
-    - Use the `--particles` flag when running the import workflow to override the config default. Example:
 
-        ```bash
-        python -m src.workflows.import_trajectories --particles 64 --output-dir data/demo
-        ```
+  - Use the `--particles` flag when running the import workflow to override the config default. Example:
 
-    - When training, use the `--limit` flag to cap the number of samples consumed for faster iterations:
+    ```bash
+    python -m src.workflows.import_trajectories --particles 64 --output-dir data/demo
+    ```
+  - When training, use the `--limit` flag to cap the number of samples consumed for faster iterations:
 
-        ```bash
-        python -m src.workflows.train_cnf --bundles data/demo --limit 1000 --epochs 5
-        ```
-
+    ```bash
+    python -m src.workflows.train_cnf --bundles data/demo --limit 1000 --epochs 5
+    ```
 - **Pretrained checkpoints:**
-    - Pretrained checkpoints are included in the repository cache under `cache/checkpoints/` (e.g. `cache/checkpoints/2d-euler-vortex_cnf/cnf_latest.pt`).
-    - To reuse an existing checkpoint during training the CLI will detect and offer to reuse it. Programmatically you can load a checkpoint with:
 
-        ```python
-        from pathlib import Path
-        from src.networks.cnf import CNFModel
-        model = CNFModel(dim=2, hidden_dim=128)
-        model.load_state_dict(torch.load(Path('cache/checkpoints/2d-euler-vortex_cnf/cnf_latest.pt')))
-        model.eval()
-        ```
+  - Pretrained checkpoints are included in the repository cache under `cache/checkpoints/` (e.g. `cache/checkpoints/2d-euler-vortex_cnf/cnf_latest.pt`).
+  - To reuse an existing checkpoint during training the CLI will detect and offer to reuse it. Programmatically you can load a checkpoint with:
 
-    - To point the workflow at a checkpoint directory use `--ckpt-dir`:
+    ```python
+    from pathlib import Path
+    from src.networks.cnf import CNFModel
+    model = CNFModel(dim=2, hidden_dim=128)
+    model.load_state_dict(torch.load(Path('cache/checkpoints/2d-euler-vortex_cnf/cnf_latest.pt')))
+    model.eval()
+    ```
+  - To point the workflow at a checkpoint directory use `--ckpt-dir`:
 
-        ```bash
-        python -m src.workflows.train_cnf --ckpt-dir cache/checkpoints/2d-euler-vortex_cnf
-        ```
-
-    - If you want a single-file example for inference (no training), load the checkpoint into the model and run your inference script as above.
+    ```bash
+    python -m src.workflows.train_cnf --ckpt-dir cache/checkpoints/2d-euler-vortex_cnf
+    ```
+  - If you want a single-file example for inference (no training), load the checkpoint into the model and run your inference script as above.
 
 ---
 
