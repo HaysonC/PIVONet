@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2024) (preloaded format=pdflatex 2025.1.7)  19 DEC 2025 15:54
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2024) (preloaded format=pdflatex 2025.1.7)  19 DEC 2025 16:06
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -649,39 +649,46 @@ Package pdftex.def Info: figures/results/inc-cylinder/ODE_inference.png  used on
 
 LaTeX Warning: `!h' float specifier changed to `!ht'.
 
+
+LaTeX Warning: Reference `apx:figures' on page 7 undefined on input line 18.
+
+
+LaTeX Warning: Reference `fig:integrator_comparison' on page 7 undefined on input line 18.
+
 <figures/results/shock-tube/vsde_vs_cnf_difference.png, id=67, 722.7pt x 361.35pt>
 File: figures/results/shock-tube/vsde_vs_cnf_difference.png Graphic file (type png)
 <use figures/results/shock-tube/vsde_vs_cnf_difference.png>
-Package pdftex.def Info: figures/results/shock-tube/vsde_vs_cnf_difference.png  used on input line 24.
+Package pdftex.def Info: figures/results/shock-tube/vsde_vs_cnf_difference.png  used on input line 26.
 (pdftex.def)             Requested size: 252.0pt x 126.00021pt.
-
-LaTeX Warning: `!h' float specifier changed to `!ht'.
-
 <figures/results/shock-tube/timestep_mae.png, id=68, 1277.77374pt x 536.0025pt>
 File: figures/results/shock-tube/timestep_mae.png Graphic file (type png)
 <use figures/results/shock-tube/timestep_mae.png>
-Package pdftex.def Info: figures/results/shock-tube/timestep_mae.png  used on input line 34.
+Package pdftex.def Info: figures/results/shock-tube/timestep_mae.png  used on input line 36.
 (pdftex.def)             Requested size: 252.0pt x 105.70189pt.
+
+LaTeX Warning: `!h' float specifier changed to `!ht'.
+
 <figures/results/distribtution.png, id=69, 735.74875pt x 576.1525pt>
 File: figures/results/distribtution.png Graphic file (type png)
 <use figures/results/distribtution.png>
-Package pdftex.def Info: figures/results/distribtution.png  used on input line 41.
+Package pdftex.def Info: figures/results/distribtution.png  used on input line 43.
 (pdftex.def)             Requested size: 252.0pt x 197.33983pt.
 
 LaTeX Warning: `!h' float specifier changed to `!ht'.
 
-[7 <./figures/results/inc-cylinder/ODE_inference.png> <./figures/results/shock-tube/vsde_vs_cnf_difference.png> <./figures/results/shock-tube/timestep_mae.png>]
-Underfull \hbox (badness 1917) in paragraph at lines 51--52
+
+Underfull \hbox (badness 1917) in paragraph at lines 53--54
 []\OT1/ptm/m/n/10 The CNF{VSDE model suc-cess-fully re-pro-duces these
  []
 
+[7 <./figures/results/inc-cylinder/ODE_inference.png> <./figures/results/shock-tube/vsde_vs_cnf_difference.png>]
 
-LaTeX Warning: Reference `apx:figures' on page 8 undefined on input line 53.
+LaTeX Warning: Reference `apx:figures' on page 8 undefined on input line 55.
 
 
-LaTeX Warning: Reference `fig:trajectory_overlay' on page 8 undefined on input line 53.
+LaTeX Warning: Reference `fig:trajectory_overlay' on page 8 undefined on input line 55.
 
-) (./discussion.tex [8 <./figures/results/distribtution.png>]) (./conclusion.tex) (./main.bbl [9]) [10
+) (./discussion.tex [8 <./figures/results/shock-tube/timestep_mae.png> <./figures/results/distribtution.png>]) (./conclusion.tex) [9] (./main.bbl) [10
 
 ] (./appendix/pyfr.tex) [11
 
@@ -730,15 +737,15 @@ LaTeX Warning: There were undefined references.
 
  ) 
 Here is how much of TeX's memory you used:
- 15729 strings out of 474116
- 315631 string characters out of 5743683
+ 15730 strings out of 474116
+ 315658 string characters out of 5743683
  1956187 words of memory out of 5000000
- 37735 multiletter control sequences out of 15000+600000
+ 37736 multiletter control sequences out of 15000+600000
  611245 words of font info for 147 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
  89i,14n,90p,1290b,556s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx7.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi5.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi6.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi9.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmib10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cmextra/cmmib7.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr5.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr6.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/courier/ucrr8a.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/times/utmbi8a.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
-Output written on main.pdf (17 pages, 3875222 bytes).
+Output written on main.pdf (17 pages, 3875695 bytes).
 PDF statistics:
  214 PDF objects out of 1000 (max. 8388607)
  119 compressed objects within 2 object streams
