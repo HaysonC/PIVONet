@@ -15,6 +15,8 @@ However, this same determinism becomes a limitation when modeling stochastic flu
 \label{fig:inc-cylinder-ode}
 \end{figure}
 
+Additionally, we can copare the integrator performance using different numerical methods. We observed no significant difference in model accuracy or stability when using Euler, RK4, or Dormand-Prince integrators for the ODE backbone. This suggests that the learned dynamics are sufficiently smooth and well-behaved, allowing lower-order methods like Euler to perform comparably to higher-order schemes. The choice of integrator thus has minimal impact on the model’s ability to capture fluid behavior in this scenario. A comparison of integrator performance is shown in Appendix~\ref{apx:figures}, Figure~\ref{fig:integrator_comparison}.
+
 \subsection{Impact of Variational Stochastic Control on Trajectory Fidelity}
 
 To improve alignment with physical variability, we evaluate the effect of incorporating variational stochastic differential equation (VSDE) control into the CNF backbone. This analysis directly addresses whether stochastic augmentation enhances trajectory fidelity and uncertainty representation.
@@ -50,17 +52,5 @@ Physical consistency is further evaluated by comparing velocity phase-space stru
 
 The CNF–VSDE model successfully reproduces these velocity-space patterns and preserves the empirical spread of particle speeds. In contrast, the CNF-only model collapses trajectories into a narrower region of velocity space, indicating an underrepresentation of physical variability. These results suggest that variational stochastic control enables the model to capture physically meaningful velocity distributions rather than merely approximating mean transport behavior.
 
-
-\begin{figure}[h!]
-    \centering
-    \includegraphics[width=0.5\linewidth]{figures/results/shock-tube/trajectory_overlay.png}
-    \caption{Qualitative comparison of trajectory reconstructions for the viscous shock tube.
-Ground-truth particle trajectories (gray) are overlaid with predictions from the CNF–VSDE model (purple) and the CNF-only model (yellow). The VSDE trajectories more closely follow the geometry and dispersion of the ground truth, particularly in regions of strong curvature and shear, while the CNF-only model exhibits accumulated drift and reduced variability.}
-    \label{fig:placeholder}
-\end{figure}
-
-\subsection{Generalization Across Flow Regimes}
-Generalization is evaluated using the viscous shock tube scenario, which is characterized by sharp gradients and significant dissipative effects. As shown in Fig.~10, the CNF–VSDE model maintains close agreement with ground-truth trajectories, while the CNF-only baseline exhibits larger deviations. The corresponding MAE distribution in Fig.~12 demonstrates a consistent shift toward lower error for the VSDE model across the trajectory ensemble.
-
-These results indicate that the proposed framework generalizes effectively to shock-dominated viscous flows without requiring architectural modification, thereby supporting the hypothesis.
+A plot of generated trajectories overlays is included in Appendi~\ref{apx:figures}, Figure~\ref{fig:trajectory_overlay}.
 

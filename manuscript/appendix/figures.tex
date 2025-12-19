@@ -1,0 +1,24 @@
+\section{Selected Additional Figures}\label{apx:figures}
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.5\linewidth]{figures/flow_visualization.png}
+    \caption{\textbf{Flow Profiles for Trajectory Generation.} (a) and (b) are velocity profiles on the top  and bottom right respectively. (c) is located bottom right, a pressure profile visualized via Paraview \cite{paraview}.  (a) \emph{Shock Tube} configuration showing discontinuity complex behavior near the wall. (b) \emph{Cylinder Flow}, where the flow impinges on a cylinder, producing a radial velocity distribution and oscillatory trail downstream. (c) \emph{Euler Vortex}, illustrating rotational shear flow with centerline velocity $U_\text{max}$. }
+    \label{fig:flow_vis}
+\end{figure}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.5\linewidth]{figures/results/shock-tube/trajectory_overlay.png}
+    \caption{Qualitative comparison of trajectory reconstructions for the viscous shock tube.
+Ground-truth particle trajectories (gray) are overlaid with predictions from the CNF–VSDE model (purple) and the CNF-only model (yellow). The VSDE trajectories more closely follow the geometry and dispersion of the ground truth, particularly in regions of strong curvature and shear, while the CNF-only model exhibits accumulated drift and reduced variability.}
+    \label{fig:trajectory_overlay}
+\end{figure}
+
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.5\linewidth]{figures/results/integrator/comparison_mae.png}
+    \caption{Comparison of mean absolute error (MAE) across different ODE integrators (Euler, Heun, RK4, Dormand-Prince) for the ODE-only CNF model on the incompressible cylinder flow. The results indicate negligible differences in accuracy and stability among the integrators, suggesting that the learned dynamics are sufficiently smooth for lower-order methods to perform comparably to higher-order schemes.}
+        
+    \label{fig:integrator_comparison}
+\end{figure}

@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2024) (preloaded format=pdflatex 2025.1.7)  19 DEC 2025 15:26
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2024) (preloaded format=pdflatex 2025.1.7)  19 DEC 2025 15:54
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -675,15 +675,15 @@ Underfull \hbox (badness 1917) in paragraph at lines 51--52
 []\OT1/ptm/m/n/10 The CNF{VSDE model suc-cess-fully re-pro-duces these
  []
 
-<figures/results/shock-tube/trajectory_overlay.png, id=77, 457.6005pt x 570.6045pt>
-File: figures/results/shock-tube/trajectory_overlay.png Graphic file (type png)
-<use figures/results/shock-tube/trajectory_overlay.png>
-Package pdftex.def Info: figures/results/shock-tube/trajectory_overlay.png  used on input line 56.
-(pdftex.def)             Requested size: 126.0pt x 157.11263pt.
 
-Underfull \vbox (badness 4543) has occurred while \output is active []
+LaTeX Warning: Reference `apx:figures' on page 8 undefined on input line 53.
 
-) (./discussion.tex [8 <./figures/results/distribtution.png> <./figures/results/shock-tube/trajectory_overlay.png>]) (./conclusion.tex [9]) (./main.bbl) [10] (./appendix/pyfr.tex) [11
+
+LaTeX Warning: Reference `fig:trajectory_overlay' on page 8 undefined on input line 53.
+
+) (./discussion.tex [8 <./figures/results/distribtution.png>]) (./conclusion.tex) (./main.bbl [9]) [10
+
+] (./appendix/pyfr.tex) [11
 
 ] (./appendix/implementation.tex
 Underfull \hbox (badness 10000) in paragraph at lines 10--11
@@ -724,20 +724,24 @@ Before submitting the final camera ready copy, remember to:
 LaTeX2e <2023-11-01> patch level 1
 L3 programming layer <2024-02-20>
  ***********
+
+
+LaTeX Warning: There were undefined references.
+
  ) 
 Here is how much of TeX's memory you used:
- 15735 strings out of 474116
- 316002 string characters out of 5743683
+ 15729 strings out of 474116
+ 315631 string characters out of 5743683
  1956187 words of memory out of 5000000
- 37741 multiletter control sequences out of 15000+600000
+ 37735 multiletter control sequences out of 15000+600000
  611245 words of font info for 147 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
  89i,14n,90p,1290b,556s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx7.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi5.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi6.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi9.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmib10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cmextra/cmmib7.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr5.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr6.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/courier/ucrr8a.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/times/utmbi8a.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
-Output written on main.pdf (17 pages, 4371006 bytes).
+Output written on main.pdf (17 pages, 3875222 bytes).
 PDF statistics:
- 216 PDF objects out of 1000 (max. 8388607)
+ 214 PDF objects out of 1000 (max. 8388607)
  119 compressed objects within 2 object streams
  0 named destinations out of 1000 (max. 500000)
- 78 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 73 words of extra memory for PDF output out of 10000 (max. 10000000)
 

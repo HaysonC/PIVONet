@@ -1,13 +1,13 @@
 # Fdb version 4
-["bibtex main"] 1766175979.20385 "main.aux" "main.bbl" "main" 1766175981.58631 0
+["bibtex main"] 1766177693.23773 "main.aux" "main.bbl" "main" 1766177695.62951 0
   "./references.bib" 1766175969.66963 4691 0847c2b6f5990b1222ff7e8a26dd7567 ""
   "/usr/local/texlive/2024/texmf-dist/bibtex/bst/base/ieeetr.bst" 1292289607 18361 1a00e58565e7f19bf2b3e1bfb82254ae ""
-  "main.aux" 1766175981.29941 15425 561796646f9a2ec15924841e3019809a "pdflatex"
+  "main.aux" 1766177695.3266 14698 63cebca039fca9aec4d142fb81a4c8d7 "pdflatex"
   (generated)
   "main.bbl"
   "main.blg"
   (rewritten before read)
-["pdflatex"] 1766175979.30649 "/Users/haysoncheung/programs/ODE/flow/manuscript/main.tex" "main.pdf" "main" 1766175981.58646 0
+["pdflatex"] 1766177693.35991 "/Users/haysoncheung/programs/ODE/flow/manuscript/main.tex" "main.pdf" "main" 1766177695.6297 0
   "/Users/haysoncheung/programs/ODE/flow/manuscript/main.tex" 1766175973.514 941 3bbcf8dccb768ecc22113a5ce326f7b1 ""
   "/usr/local/texlive/2024/texmf-dist/fonts/enc/dvips/base/8r.enc" 1165713224 4850 80dc9bab7f31fb78a000ccfed0e27cab ""
   "/usr/local/texlive/2024/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
@@ -216,15 +216,14 @@
   "figures/results/distribtution.png" 1766175969.60588 284890 7b6beddaa83b2e395f470ea125d15ce8 ""
   "figures/results/inc-cylinder/ODE_inference.png" 1766175969.60947 105395 18b5da1a2baf8890909f755983e617c9 ""
   "figures/results/shock-tube/timestep_mae.png" 1766175969.62189 310020 d7d84509c92f921851b0698642454ab6 ""
-  "figures/results/shock-tube/trajectory_overlay.png" 1766175969.62621 460940 61cc5c5b4ce5aefcaa35f4b6dcbd6ab4 ""
   "figures/results/shock-tube/vsde_vs_cnf_difference.png" 1766175969.62796 23965 62f19cdcf6284eb85d79b116d8fba5fa ""
   "introduction.tex" 1766175969.63069 1298 4738277b7b00c66f35f4876f4e187c34 ""
-  "main.aux" 1766175981.29941 15425 561796646f9a2ec15924841e3019809a "pdflatex"
-  "main.bbl" 1766175979.30333 2789 d23f3f66868e3b505a353b65a3de5cec "bibtex main"
+  "main.aux" 1766177695.3266 14698 63cebca039fca9aec4d142fb81a4c8d7 "pdflatex"
+  "main.bbl" 1766177693.35687 2789 d23f3f66868e3b505a353b65a3de5cec "bibtex main"
   "main.tex" 1766175973.514 941 3bbcf8dccb768ecc22113a5ce326f7b1 ""
   "model.tex" 1766175969.66576 13916 86424d57fbf4bf036bd643d6135687da ""
   "preamble.tex" 1766175969.66819 1138 da0098f98b427afff3f5bdbb5613d5a1 ""
-  "results.tex" 1766175969.67088 7301 0755795fb0e2e5f591de94504ad7621a ""
+  "results.tex" 1766177690.44766 6105 cb1f7e290d5ca480ff60f8f2c85e3cd2 ""
   (generated)
   "main.aux"
   "main.log"

@@ -425,11 +425,6 @@ INPUT ./figures/results/distribtution.png
 INPUT ./figures/results/distribtution.png
 INPUT ./figures/results/distribtution.png
 INPUT ./figures/results/distribtution.png
-INPUT ./figures/results/shock-tube/trajectory_overlay.png
-INPUT ./figures/results/shock-tube/trajectory_overlay.png
-INPUT ./figures/results/shock-tube/trajectory_overlay.png
-INPUT ./figures/results/shock-tube/trajectory_overlay.png
-INPUT ./figures/results/shock-tube/trajectory_overlay.png
 INPUT ./discussion.tex
 INPUT ./discussion.tex
 INPUT ./discussion.tex
@@ -442,11 +437,11 @@ INPUT ./conclusion.tex
 INPUT ./conclusion.tex
 INPUT ./conclusion.tex
 INPUT conclusion.tex
-INPUT /usr/local/texlive/2024/texmf-dist/fonts/vf/adobe/times/ptmrc7t.vf
-INPUT /usr/local/texlive/2024/texmf-dist/fonts/tfm/adobe/times/ptmr8r.tfm
 INPUT ./main.bbl
 INPUT ./main.bbl
 INPUT main.bbl
+INPUT /usr/local/texlive/2024/texmf-dist/fonts/vf/adobe/times/ptmrc7t.vf
+INPUT /usr/local/texlive/2024/texmf-dist/fonts/tfm/adobe/times/ptmr8r.tfm
 INPUT ./appendix/pyfr.tex
 INPUT ./appendix/pyfr.tex
 INPUT ./appendix/pyfr.tex
