@@ -19,8 +19,10 @@ from .chat import FlowChat
 from .commands import run_import, run_visualize, run_modeling, run_import_model
 from ..utils.orchestrator import ExperimentOrchestrator
 
-CLI_COMMANDS = ("import", "visualize", "model", "experiment")
+# The dev options command is hidden from the conversational CLI for now.
+# CLI_COMMANDS = ("import", "visualize", "model", "experiment")
 
+CLI_COMMANDS = ("import", "experiment")
 
 def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="PIVO CLI entry point", add_help=True)
@@ -324,7 +326,7 @@ def _import_model_targets() -> list[str]:
 def _import_model_options(chat: FlowChat) -> LaunchOptions:
     source_path = _ask_path(
         chat,
-        "Path to a downloaded checkpoint folder OR a single .pt file",
+        "Path to a downloaded checkpoint folder OR a single .pt file.",
         required=True,
         default_key="import_model_source",
     )
